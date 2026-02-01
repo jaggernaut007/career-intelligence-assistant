@@ -2,7 +2,7 @@
 ## 1. Setup and Installation Guide
 1. **Clone the Repository**
    ```bash
-   git clone <repo-url>
+   git clone git@github.com:jaggernaut007/career-intelligence-assistant.git
    cd career-intelligence-assistant
    ```
 
@@ -15,8 +15,16 @@
    cp .env.example .env
    # Edit .env with your keys:
    # NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
-   # OPENAI_API_KEY, HUGGINGFACE_TOKEN
+   # OPENAI_API_KEY, HF_TOKEN
    ```
+
+   **Environment file locations:**
+   | Scenario | .env Location | Notes |
+   |----------|---------------|-------|
+   | Local development | `backend/.env` | Required when running `uv run uvicorn` from backend/ |
+   | Docker Compose | `root/.env` | Required for `docker-compose up` |
+
+   > **Tip:** To keep both in sync, you can create a symlink: `cd backend && ln -s ../.env .env`
 
 5. **Install Dependencies**
    ```bash
@@ -37,6 +45,27 @@
    uv run pytest
    ```
 
+8. **Using Docker (Alternative to steps 5-7)**
+
+   **Prerequisites:** Ensure Docker and Docker Compose are installed on your system.
+
+   **Development Mode:**
+   ```bash
+   # Build and run with hot reload
+   docker-compose up --build
+
+
+   # Stop containers
+   docker-compose down
+   ```
+
+   **Access Points:**
+   | Service | Development |
+   |---------|-------------|
+   | Frontend | http://localhost:5173 | 
+   | Backend API | http://localhost:8000 | 
+   | API Docs | http://localhost:8000/docs |
+
 ## 2. Usage Instructions
 1. Open your web browser and navigate to `http://localhost:5123` to access the Career Intelligence Platform.
 2. Upload your resume and job descriptions.
@@ -45,41 +74,41 @@
 
 ## 3. Features Overview
 - **Resume Analysis**: Upload and analyze resumes for skill gaps and improvements.
-- **Job Description Comparison**: Compare resumes against upto 5 job descriptions to identify matches.
+- **Job Description Comparison**: Compare resumes against up to 5 job descriptions to identify matches.
 - **Skill Development Recommendations**: Get recommendations for skill development based on job market trends.
-- **Interview preparation**: Interview tips and common questions and sample answers.
+- **Interview Preparation**: Interview tips and common questions and sample answers.
 - **Market Trends Analysis**: Stay updated with the latest trends in your industry.
 - **AI-Powered Chat**: Interact with an AI assistant for personalized career advice.
 
 ## 4. Key Decisions Made
 - **Neo4j AuraDB**: Chosen for its robust graph database capabilities, ideal for modeling complex relationships in career data vs Pinecone which was considered but not selected due to its efficiency in handling vector data but less suited for relational data modeling.
 - **OpenAI**: Selected GPT-5.2 for its high reasoning capabilities enhancing the AI assistant's performance in understanding and generating human-like text.
-- **FastAPI and React**: Used for backend and frontend development respectively,for multi threading and fast development and servers.
+- **FastAPI and React**: Used for backend and frontend development respectively, for multi-threading and fast development and servers.
 - **UV package manager**: Utilized for efficient dependency management and environment setup.
-- **LlamaIndex**: Employed for building a knowledge graph from unstructured data, enhancing the AI's understanding of career-related information. Its efficiency in RAG workloads. Its workflow framework was leveraged to implement a multi-agentic approach, allowing different AI models to specialize in various tasks vs langraph which was considered but not selected due to its complexity and overhead for this specific use case.
-- **Nomic Embed Text v1.5**: Used nomic-embed-text-v1.5 embeddings for generating high-quality text embeddings to improve semantic search and recommendations, ondevice with high latency vs other embedding models which were considered but not selected due to their lower performance in this context.
+- **LlamaIndex**: Employed for building a knowledge graph from unstructured data, enhancing the AI's understanding of career-related information. Its efficiency in RAG workloads. Its workflow framework was leveraged to implement a multi-agentic approach, allowing different AI models to specialize in various tasks vs LangGraph which was considered but not selected due to its complexity and overhead for this specific use case.
+- **Nomic Embed Text v1.5**: Used nomic-embed-text-v1.5 embeddings for generating high-quality text embeddings to improve semantic search and recommendations, on-device with high latency vs other embedding models which were considered but not selected due to their lower performance in this context.
 - **Docker**: Considered for containerization, if we would need to deploy, but opted for local setup to simplify initial development and testing.
 - **Modular Architecture**: Designed the application with a modular approach to facilitate future enhancements and maintenance. Easy to use service-oriented and model layers based architecture.
 - **OpenAI GPT-5.2**: Leveraged for its superior language understanding and generation capabilities, enhancing the AI assistant's performance in providing career advice and insights.
 - **Claude Code Interpreter**: Integrated for its advanced code interpretation features, and ability to handle complex coding tasks while pair programming.
-- **Test driven and Spec supported Development**: Adopted TDD approach to ensure code quality and reliability through comprehensive testing and speci driven development practices for clear requirements and functionality definition to ensure the AI understand everything deterministically.
+- **Test-Driven and Spec-Supported Development**: Adopted TDD approach to ensure code quality and reliability through comprehensive testing and spec-driven development practices for clear requirements and functionality definition to ensure the AI understands everything deterministically.
 
 ## 5. Detailed decisions made
 - **Vectorisation Strategy**: Chose Nomic Embed Text v1.5 for its ability to generate high-quality text embeddings, which significantly improves the accuracy of semantic search and recommendations within the platform. This combined with the use of Neo4j Vector Search capabilities allows for efficient storage and retrieval of vector data through graph traversal and embedding comparison, enhancing the overall performance of the AI assistant.
 - **Multi-agentic Approach**: Implemented a multi-agentic architecture using LlamaIndex workflow framework to allow different AI models to specialize in various tasks, such as resume analysis, job description comparison, interview preparation, recommendation and market analysis. This specialisation leads to more accurate and relevant responses for users.
 - **Guardrails and Safety**: Implemented a 5-layer security architecture to ensure reliable and safe AI interactions. 
     - Layer 1: PII Detection using Microsoft Presidio with spaCy NLP to automatically detect and redact SSNs, phone numbers, emails, and addresses from resumes before processing.
-    - Layer 2: Prompt Injection Guard using pattern matching to detect instrusion and security threats in user inputs before passing to LLMs.
+    - Layer 2: Prompt Injection Guard using pattern matching to detect intrusion and security threats in user inputs before passing to LLMs.
     - Layer 3: Input Validation that verifies file types, enforces 10MB size limits, and blocks dangerous file types like executables and scripts. 
     - Layer 4: Rate Limiting via slowapi enforcing 10 requests/minute per session to prevent API abuse. 
     - Layer 5: Output Filtering that sanitizes LLM responses, strips leaked system prompts, and validates JSON structure before returning to the frontend.
-- **Phase by phase Rollout**: Adopted a phased approach to development and testing framework with a spec supported development to ensure that each feature is thoroughly vetted before being integrated into the main platform. This approach allows for incremental improvements and reduces the risk of introducing bugs or issues.
+- **Phase-by-Phase Rollout**: Adopted a phased approach to development and testing framework with a spec-supported development to ensure that each feature is thoroughly vetted before being integrated into the main platform. This approach allows for incremental improvements and reduces the risk of introducing bugs or issues.
 - **Wizard based Onboarding with chatbot**: Developed a user-friendly onboarding wizard to guide new users through the platform's features and functionalities, ensuring a smooth and intuitive user experience from the outset, while the chatbot provides real-time assistance and support.
-- **Neo4j deployment**: Opted for Neo4j AuraDB for its managed cloud service, which simplifies database management and scaling. This choice makes it easy to manage the graph database without the overhead of self-hosting, plus used cacheing strategies to optimize query performance and reduce latency.
-- **inMemory Session Management**: Chose in-memory session management for simplicity and speed during development. This approach allows for quick access to session data without the complexity of external session stores, making it ideal for the initial phases of the project.
+- **Neo4j Deployment**: Opted for Neo4j AuraDB for its managed cloud service, which simplifies database management and scaling. This choice makes it easy to manage the graph database without the overhead of self-hosting, plus used caching strategies to optimize query performance and reduce latency.
+- **In-Memory Session Management**: Chose in-memory session management for simplicity and speed during development. This approach allows for quick access to session data without the complexity of external session stores, making it ideal for the initial phases of the project.
 - **Observability and Monitoring**: Integrated logging and monitoring tools to track application performance, user interactions, and potential issues. This setup helps in proactive maintenance and ensures a smooth user experience.
 - **Evaluation and Benchmarking**: Established a framework for evaluating the performance of different AI models by using the concept of LLM as a judge to benchmark responses based on relevance, accuracy, and user satisfaction. This approach allows for continuous improvement of the AI assistant by identifying the best-performing models for specific tasks.
-- **Resume and Job processing Pipeline**: Developed a robust pipeline for processing resumes and job descriptions, including text extraction, cleaning, vectorization, and storage in Neo4j. This pipeline ensures that the data is accurately represented and easily retrievable for analysis and recommendations. We performthis by 
+- **Resume and Job Processing Pipeline**: Developed a robust pipeline for processing resumes and job descriptions, including text extraction, cleaning, vectorization, and storage in Neo4j. This pipeline ensures that the data is accurately represented and easily retrievable for analysis and recommendations. We perform this by:
     - Text Extraction: Extract text from various document formats (PDF, DOCX).
     - Text Cleaning: Implementing NLP techniques to clean and preprocess the extracted text, removing noise and irrelevant information.
     - Using LLamaIndex to extract entities, skills, experiences, and other relevant information from the text.
@@ -548,11 +577,11 @@ Parallel execution via @step + ctx.send_event() reduces time by ~60%
 ```
 
 ## 7. Deferred Decisions
-- **Pinecone vs Neo4j AuraDB**: Needed a database for both vector search and relationship modeling. Evaluated Pinecone for vectors but chose Neo4j AuraDB to unify graph relationships and vector embeddings in one store, eliminating ambiguous vector retreivals and enabling graph-traversal + similarity search in single queries using embedding properties.
+- **Pinecone vs Neo4j AuraDB**: Needed a database for both vector search and relationship modeling. Evaluated Pinecone for vectors but chose Neo4j AuraDB to unify graph relationships and vector embeddings in one store, eliminating ambiguous vector retrievals and enabling graph-traversal + similarity search in single queries using embedding properties.
 - **LangGraph vs LlamaIndex**: Required a framework for multi-agent orchestration. Evaluated LangGraph but chose LlamaIndex workflow for its native Neo4j integration, simpler workflow API, and 35% better retrieval accuracy in RAG benchmarks, reducing development time while improving response quality.
-- **Message Bus vs LlamaIndex Workflow**: Needed inter-agent communication for parallel processing. Evaluated Redis pub/sub and RabbitMQ messaging services but chose LlamaIndex's built-in workflow engine. Parallel execution achieved was also acheived. Trade-off: single-process only, but sufficient for demo scale with upgrade path to Redis if needed.
+- **Message Bus vs LlamaIndex Workflow**: Needed inter-agent communication for parallel processing. Evaluated Redis pub/sub and RabbitMQ messaging services but chose LlamaIndex's built-in workflow engine. Parallel execution was achieved. Trade-off: single-process only, but sufficient for demo scale with upgrade path to Redis if needed.
 - **Generalist vs Specialized Agents**: Needed to balance accuracy against complexity. Chose 7 specialized agents (Resume Parser, JD Analyzer, Skill Matcher, Recommendation, Interview Prep, Market Insights, Chat Fit) over fewer generalists, achieving more focused prompts and enabling parallel execution that reduced analysis time by 60%.
-- **Direct Vectorization vs Document Processing**: Needed to extract career data from resumes. Evaluated direct embedding by chucking the document, but chose structured NER extraction via GPT-5.2 to capture skills, experiences, and relationships, enabling richer graph modeling and more accurate skill-gap analysis than pure semantic search.
+- **Direct Vectorization vs Document Processing**: Needed to extract career data from resumes. Evaluated direct embedding by chunking the document, but chose structured NER extraction via GPT-5.2 to capture skills, experiences, and relationships, enabling richer graph modeling and more accurate skill-gap analysis than pure semantic search.
 - **Graph-Aware Skill Normalization vs Simple Embedding**: Needed to handle skill variations ("React.js" vs "ReactJS"). Chose LLM extraction with Neo4j context over pure embedding similarity,or using a pure LLM based graph storage technique. Making the system self-improving as the graph grows. Optimized with 5-minute caching (20ms → 1ms) and parallel fallback (1.5s → 200ms), adding only 200-400ms total latency.
 
 ## 8. Future Enhancements
@@ -560,7 +589,7 @@ Parallel execution via @step + ctx.send_event() reduces time by ~60%
 - **Better evaluations**: Integrate more comprehensive evaluation metrics and benchmarking tools to continuously assess and improve the AI models' performance as opposed to just LLM as judge.
 - **Better Tracing and Observability**: Implement LLM tracing and enhanced logging for better monitoring and debugging.
 - **Dexterity in LlamaIndex Workflow** : Explore more complex multi-agent workflows and dynamic task allocation based on real-time performance metrics.
-- **Prompt Optimization**: Continuously refine and optimize prompts for better accuracy and relevance in AI responses based on traces and evaluaitons.
+- **Prompt Optimization**: Continuously refine and optimize prompts for better accuracy and relevance in AI responses based on traces and evaluations.
 - **Better Resume Parsing**: Integrate more advanced NLP techniques for improved extraction of skills and experiences from resumes.
 - **Knowledge Graph Enhancements**: More complex and in-depth knowledge graph relationships to capture nuanced skill interdependencies.
 - **Enhanced User Interface**: Improve the frontend design for a more intuitive and engaging user experience.
@@ -569,18 +598,21 @@ Parallel execution via @step + ctx.send_event() reduces time by ~60%
 - **Optimized Token Tracking and Usage Monitoring**: Implement improved token tracking and usage monitoring to reduce costs and improve efficiency.
 
 
-## 9 Remaining Questions from requirements doc
+## 9. Remaining Questions from requirements doc
 
 1. What would be required to productionize your solution, make it scalable and deploy it on a hyper-scaler such as AWS / GCP / Azure?
-   - The containerised application can be deployed using Docker on a cloud platform like AWS using services such as ECS or EKS for scalability. We could use  auto-scaling groups, load balancers, and use the already implemented Neo4j AuraDB for database management. We couldimplement monitoring and logging using tools like CloudWatch. For evaluations we could use Arize or Langsmith.
+   - The containerised application can be deployed using Docker on a cloud platform like AWS using services such as ECS or EKS for scalability. We could use auto-scaling groups, load balancers, and use the already implemented Neo4j AuraDB for database management. We could implement monitoring and logging using tools like CloudWatch. For evaluations we could use Arize or Langsmith.
 2. Engineering standards you’ve followed (and maybe some that you skipped)
    - Followed standards: Modular code structure, containerization with Docker, use of version control (Git), comprehensive testing (unit, integration, contract, end to end, evaluations), and Spec driven documentation.
-   - Skipped standards: Encryptions,Authentications extensive logging and monitoring.
+   - Skipped standards: Encryptions, authentications, extensive logging and monitoring.
 3. How you used AI tools in your development process
    - Used Claude code for Research assistance, writing modules and testing.
    - Writing the comprehensive documentation (Not the README.md)
    - Generated Architecture diagram on README.md
 4. What you'd do differently with more time
    - With more time, I would implement a more complex multi-agent workflow in LlamaIndex, and further optimize prompts based on evaluation feedback.
-   - Better documenation on platform based tools.
+   - Better documentation on platform-based tools.
    - Optimise and refactor codebase for production readiness.
+   - More comprehensive session management from frontend.
+   - Persistent memory for sessions and agents.
+   - Memory for agents to improve context retention.
