@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # OpenAI Configuration
     # ========================================================================
     openai_api_key: str = Field(..., description="OpenAI API key")
-    openai_model: str = Field("gpt-5-mini", description="OpenAI model to use")
+    openai_model: str = Field("gpt-5.2", description="OpenAI model to use")
 
     # ========================================================================
     # Neo4j Configuration

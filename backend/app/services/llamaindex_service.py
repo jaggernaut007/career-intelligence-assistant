@@ -51,13 +51,17 @@ class LlamaIndexService:
 
             # Initialize LLM with longer timeout for complex prompts
             logger.info(f"Initializing LlamaIndex LLM: {settings.openai_model}")
-            self._llm = LlamaOpenAI(
-                model=settings.openai_model,
-                api_key=settings.openai_api_key,
-                temperature=0.3,
-                timeout=120.0,  # 2 minute timeout for complex prompts
-                max_retries=3,  # Retry on transient failures
-            )
+            llm_kwargs = {
+                "model": settings.openai_model,
+                "api_key": settings.openai_api_key,
+                "timeout": 120.0,  # 2 minute timeout for complex prompts
+                "max_retries": 3,  # Retry on transient failures
+            }
+            # Only set temperature for models that support it (not reasoning models)
+            reasoning_models = ["o1", "o1-mini", "o1-preview", "gpt-5", "gpt-5.2"]
+            if not any(rm in settings.openai_model for rm in reasoning_models):
+                llm_kwargs["temperature"] = 0.3
+            self._llm = LlamaOpenAI(**llm_kwargs)
 
             # Initialize embedding model
             logger.info(f"Initializing embedding model: {settings.embedding_model}")
@@ -116,7 +120,7 @@ class LlamaIndexService:
         Args:
             prompt: User prompt
             system_prompt: Optional system prompt
-            temperature: Sampling temperature
+            temperature: Sampling temperature (ignored for reasoning models)
 
         Returns:
             Generated text
@@ -131,8 +135,16 @@ class LlamaIndexService:
                 messages.append(ChatMessage(role=MessageRole.SYSTEM, content=system_prompt))
             messages.append(ChatMessage(role=MessageRole.USER, content=prompt))
 
-            # Use async chat
-            response = await self._llm.achat(messages, temperature=temperature)
+            # Check if model supports temperature
+            settings = get_settings()
+            reasoning_models = ["o1", "o1-mini", "o1-preview", "gpt-5", "gpt-5.2"]
+
+            if any(rm in settings.openai_model for rm in reasoning_models):
+                # Reasoning models don't support temperature
+                response = await self._llm.achat(messages)
+            else:
+                response = await self._llm.achat(messages, temperature=temperature)
+
             return response.message.content or ""
 
         except Exception as e:

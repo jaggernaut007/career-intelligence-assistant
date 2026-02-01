@@ -583,3 +583,4 @@ Parallel execution via @step + ctx.send_event() reduces time by ~60%
 4. What you'd do differently with more time
    - With more time, I would implement a more complex multi-agent workflow in LlamaIndex, and further optimize prompts based on evaluation feedback.
    - Better documenation on platform based tools.
+   - Optimise and refactor codebase for production readiness.
