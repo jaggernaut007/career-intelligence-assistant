@@ -1,0 +1,1020 @@
+openapi: 3.1.0
+info:
+  title: Career Intelligence Assistant API
+  description: |
+    Multi-agent AI system that analyzes resumes against job descriptions,
+    providing fit analysis, skill gaps, experience alignment, and interview preparation.
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: https://api.career-assistant.run.app
+    description: Production (GCP Cloud Run)
+
+tags:
+  - name: Session
+    description: Session management
+  - name: Upload
+    description: Document upload endpoints
+  - name: Analysis
+    description: Resume-JD analysis endpoints
+  - name: Results
+    description: Analysis results retrieval
+  - name: Health
+    description: Health check endpoints
+
+paths:
+  /api/v1/session:
+    post:
+      tags: [Session]
+      summary: Create a new analysis session
+      operationId: createSession
+      responses:
+        '201':
+          description: Session created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/session/{session_id}:
+    get:
+      tags: [Session]
+      summary: Get session status
+      operationId: getSessionStatus
+      parameters:
+        - $ref: '#/components/parameters/SessionIdPath'
+      responses:
+        '200':
+          description: Session status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionStatusResponse'
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+    delete:
+      tags: [Session]
+      summary: Delete session
+      operationId: deleteSession
+      parameters:
+        - $ref: '#/components/parameters/SessionIdPath'
+      responses:
+        '204':
+          description: Session deleted successfully
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+
+  /api/v1/upload/resume:
+    post:
+      tags: [Upload]
+      summary: Upload resume for analysis
+      operationId: uploadResume
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ResumeUploadRequest'
+      responses:
+        '200':
+          description: Resume parsed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParsedResumeResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '413':
+          $ref: '#/components/responses/FileTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/upload/job-description:
+    post:
+      tags: [Upload]
+      summary: Upload or submit job description
+      operationId: uploadJobDescription
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/JobDescriptionUploadRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobDescriptionTextRequest'
+      responses:
+        '200':
+          description: Job description parsed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParsedJobDescriptionResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/analyze:
+    post:
+      tags: [Analysis]
+      summary: Run full analysis on resume against job descriptions
+      operationId: runAnalysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeRequest'
+      responses:
+        '202':
+          description: Analysis started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisStartedResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/results/{session_id}:
+    get:
+      tags: [Results]
+      summary: Get analysis results for a session
+      operationId: getResults
+      parameters:
+        - $ref: '#/components/parameters/SessionIdPath'
+      responses:
+        '200':
+          description: Analysis results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResultsResponse'
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+
+  /api/v1/recommendations/{session_id}:
+    get:
+      tags: [Results]
+      summary: Get recommendations for resume improvement
+      operationId: getRecommendations
+      parameters:
+        - $ref: '#/components/parameters/SessionIdPath'
+        - $ref: '#/components/parameters/JobIdQuery'
+      responses:
+        '200':
+          description: Recommendations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationsResponse'
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+
+  /api/v1/interview-prep/{session_id}:
+    get:
+      tags: [Results]
+      summary: Get interview preparation materials
+      operationId: getInterviewPrep
+      parameters:
+        - $ref: '#/components/parameters/SessionIdPath'
+        - $ref: '#/components/parameters/JobIdQuery'
+      responses:
+        '200':
+          description: Interview preparation materials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InterviewPrepResponse'
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+
+  /api/v1/market-insights/{session_id}:
+    get:
+      tags: [Results]
+      summary: Get market insights for target roles
+      operationId: getMarketInsights
+      parameters:
+        - $ref: '#/components/parameters/SessionIdPath'
+        - $ref: '#/components/parameters/JobIdQuery'
+      responses:
+        '200':
+          description: Market insights
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketInsightsResponse'
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+
+  /api/v1/progress/{session_id}:
+    get:
+      tags: [Analysis]
+      summary: Get analysis progress
+      operationId: getProgress
+      description: Get current progress of running analysis (REST alternative to WebSocket)
+      parameters:
+        - $ref: '#/components/parameters/SessionIdPath'
+      responses:
+        '200':
+          description: Analysis progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressResponse'
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check endpoint
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  parameters:
+    SessionIdPath:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Session identifier
+
+    JobIdQuery:
+      name: job_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+      description: Specific job description ID (optional, returns all if not specified)
+
+  schemas:
+    # ==================== Session ====================
+    SessionResponse:
+      type: object
+      required: [session_id, created_at, expires_at]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+
+    SessionStatusResponse:
+      type: object
+      required: [session_id, created_at, expires_at, analysis_status]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        resume_id:
+          type: string
+        job_descriptions:
+          type: object
+          additionalProperties: true
+        analysis_status:
+          type: string
+          enum: [pending, running, completed, failed]
+        analysis_id:
+          type: string
+
+    ProgressResponse:
+      type: object
+      required: [session_id, status, agent_progress]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        analysis_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        agent_progress:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/AgentStatusUpdate'
+
+    AgentStatusUpdate:
+      type: object
+      required: [agent_name, status, progress]
+      properties:
+        agent_name:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        current_step:
+          type: string
+        error:
+          type: string
+
+    # ==================== Upload Requests ====================
+    ResumeUploadRequest:
+      type: object
+      required: [file, session_id]
+      properties:
+        file:
+          type: string
+          format: binary
+          description: Resume file (PDF, DOCX, or TXT, max 10MB)
+        session_id:
+          type: string
+          format: uuid
+
+    JobDescriptionUploadRequest:
+      type: object
+      required: [session_id]
+      properties:
+        file:
+          type: string
+          format: binary
+          description: Job description file (PDF, DOCX, or TXT)
+        session_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 200
+          description: Optional job title
+
+    JobDescriptionTextRequest:
+      type: object
+      required: [session_id, text]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        text:
+          type: string
+          minLength: 50
+          maxLength: 50000
+          description: Job description text content
+        title:
+          type: string
+          maxLength: 200
+          description: Optional job title
+        company:
+          type: string
+          maxLength: 200
+          description: Optional company name
+
+    # ==================== Parsed Documents ====================
+    ParsedResumeResponse:
+      type: object
+      required: [resume_id, status, skills, experiences, education]
+      properties:
+        resume_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [parsed, error]
+        skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/Skill'
+        experiences:
+          type: array
+          items:
+            $ref: '#/components/schemas/Experience'
+        education:
+          type: array
+          items:
+            $ref: '#/components/schemas/Education'
+        summary:
+          type: string
+          description: AI-generated resume summary
+        pii_redacted:
+          type: boolean
+          description: Whether PII was detected and redacted
+
+    ParsedJobDescriptionResponse:
+      type: object
+      required: [job_id, status, title, requirements]
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [parsed, error]
+        title:
+          type: string
+        company:
+          type: string
+        requirements:
+          type: array
+          items:
+            $ref: '#/components/schemas/Requirement'
+        required_skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/Skill'
+        nice_to_have_skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/Skill'
+
+    # ==================== Core Data Types ====================
+    Skill:
+      type: object
+      required: [name, category, level]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: "Python"
+        category:
+          type: string
+          enum: [programming, framework, tool, soft_skill, domain, certification, language]
+          example: "programming"
+        level:
+          type: string
+          enum: [beginner, intermediate, advanced, expert]
+          example: "advanced"
+        years_experience:
+          type: number
+          minimum: 0
+          maximum: 50
+          example: 5
+
+    Experience:
+      type: object
+      required: [title, company, duration]
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          example: "Senior Software Engineer"
+        company:
+          type: string
+          maxLength: 200
+          example: "Google"
+        duration:
+          type: string
+          example: "2020-2023"
+        duration_months:
+          type: integer
+          minimum: 0
+          example: 36
+        description:
+          type: string
+          maxLength: 5000
+        skills_used:
+          type: array
+          items:
+            type: string
+
+    Education:
+      type: object
+      required: [degree, institution]
+      properties:
+        degree:
+          type: string
+          maxLength: 200
+          example: "B.S. Computer Science"
+        institution:
+          type: string
+          maxLength: 200
+          example: "Stanford University"
+        year:
+          type: integer
+          minimum: 1950
+          maximum: 2030
+          example: 2020
+        gpa:
+          type: number
+          minimum: 0
+          maximum: 4.0
+        field_of_study:
+          type: string
+          maxLength: 200
+          example: "Computer Science"
+
+    Requirement:
+      type: object
+      required: [text, type]
+      properties:
+        text:
+          type: string
+          maxLength: 1000
+        type:
+          type: string
+          enum: [must_have, nice_to_have, responsibility]
+        skills:
+          type: array
+          items:
+            type: string
+
+    # ==================== Analysis ====================
+    AnalyzeRequest:
+      type: object
+      required: [session_id]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+
+    AnalysisStartedResponse:
+      type: object
+      required: [analysis_id, status, websocket_url]
+      properties:
+        analysis_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [started, queued]
+        websocket_url:
+          type: string
+          format: uri
+          description: WebSocket URL for real-time progress updates
+        estimated_duration_seconds:
+          type: integer
+          minimum: 0
+          example: 30
+
+    AnalysisResultsResponse:
+      type: object
+      required: [session_id, status, job_matches]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [completed, in_progress, failed]
+        job_matches:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobMatch'
+        completed_at:
+          type: string
+          format: date-time
+
+    SkillMatch:
+      type: object
+      required: [skill_name, resume_level, match_quality]
+      properties:
+        skill_name:
+          type: string
+        resume_level:
+          type: string
+          enum: [beginner, intermediate, advanced, expert]
+        required_level:
+          type: string
+          enum: [beginner, intermediate, advanced, expert]
+        match_quality:
+          type: string
+          enum: [exact, partial, exceeds]
+
+    MissingSkill:
+      type: object
+      required: [skill_name, importance, difficulty_to_acquire]
+      properties:
+        skill_name:
+          type: string
+        importance:
+          type: string
+          enum: [must_have, nice_to_have]
+        difficulty_to_acquire:
+          type: string
+          enum: [easy, medium, hard]
+
+    JobMatch:
+      type: object
+      required: [job_id, resume_id, job_title, fit_score, skill_match_score, experience_match_score, education_match_score, matching_skills, missing_skills]
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        resume_id:
+          type: string
+          format: uuid
+        job_title:
+          type: string
+        company:
+          type: string
+        fit_score:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Overall fit percentage (0-100)
+          example: 78
+        skill_match_score:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Skill match percentage
+        experience_match_score:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Experience match percentage
+        education_match_score:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Education match percentage
+        matching_skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillMatch'
+        missing_skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/MissingSkill'
+        transferable_skills:
+          type: array
+          items:
+            type: string
+          description: Skills that could transfer to this role
+
+    # ==================== Recommendations ====================
+    RecommendationsResponse:
+      type: object
+      required: [session_id, recommendations]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        recommendations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Recommendation'
+        priority_order:
+          type: array
+          items:
+            type: string
+          description: Recommendation IDs in priority order
+        estimated_improvement:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Estimated fit score improvement after following recommendations
+
+    Recommendation:
+      type: object
+      required: [id, category, priority, title, description]
+      properties:
+        id:
+          type: string
+          format: uuid
+        category:
+          type: string
+          enum: [skill_gap, resume_improvement, experience_highlight, certification, networking]
+        priority:
+          type: string
+          enum: [high, medium, low]
+        title:
+          type: string
+          maxLength: 200
+          example: "Add Kubernetes experience"
+        description:
+          type: string
+          maxLength: 2000
+          example: "The role requires container orchestration. Consider taking a course or working on a personal project."
+        action_items:
+          type: array
+          items:
+            type: string
+        estimated_time:
+          type: string
+          description: Estimated time to complete (e.g., "2-4 weeks")
+        resources:
+          type: array
+          items:
+            type: string
+          description: Helpful resources for this recommendation
+
+    # ==================== Interview Prep ====================
+    InterviewPrepResponse:
+      type: object
+      required: [session_id, questions]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/InterviewQuestion'
+        talking_points:
+          type: array
+          items:
+            type: string
+        weakness_responses:
+          type: array
+          items:
+            $ref: '#/components/schemas/WeaknessResponse'
+          description: Prepared responses for skill gaps/weaknesses
+        questions_to_ask:
+          type: array
+          items:
+            type: string
+          description: Questions the candidate should ask the interviewer
+
+    InterviewQuestion:
+      type: object
+      required: [id, question, category, difficulty, suggested_answer]
+      properties:
+        id:
+          type: string
+          format: uuid
+        question:
+          type: string
+          maxLength: 1000
+          example: "Describe a time when you had to scale a distributed system."
+        category:
+          type: string
+          enum: [behavioral, technical, situational, culture_fit]
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+        why_asked:
+          type: string
+          maxLength: 500
+          description: Explanation of why this question might be asked
+        suggested_answer:
+          type: string
+          maxLength: 3000
+          description: Suggested answer based on resume
+        star_example:
+          $ref: '#/components/schemas/STARExample'
+        related_experience:
+          type: string
+          maxLength: 500
+          description: Reference to relevant experience from resume
+
+    STARExample:
+      type: object
+      required: [situation, task, action, result]
+      properties:
+        situation:
+          type: string
+          maxLength: 500
+        task:
+          type: string
+          maxLength: 500
+        action:
+          type: string
+          maxLength: 1000
+        result:
+          type: string
+          maxLength: 500
+
+    WeaknessResponse:
+      type: object
+      required: [weakness, honest_response, mitigation]
+      properties:
+        weakness:
+          type: string
+          maxLength: 200
+          description: The skill gap or weakness
+        honest_response:
+          type: string
+          maxLength: 1000
+          description: Honest acknowledgment of the weakness
+        mitigation:
+          type: string
+          maxLength: 500
+          description: How you're addressing or working on this weakness
+
+    # ==================== Market Insights ====================
+    MarketInsightsResponse:
+      type: object
+      required: [session_id, insights]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        insights:
+          $ref: '#/components/schemas/MarketInsights'
+
+    MarketInsights:
+      type: object
+      required: [salary_range, demand_trend, industry_insights, data_freshness]
+      properties:
+        salary_range:
+          $ref: '#/components/schemas/SalaryRange'
+        demand_trend:
+          type: string
+          enum: [increasing, stable, decreasing]
+        top_skills_in_demand:
+          type: array
+          items:
+            type: string
+        career_paths:
+          type: array
+          items:
+            $ref: '#/components/schemas/CareerPath'
+        industry_insights:
+          type: string
+          maxLength: 2000
+        competitive_landscape:
+          type: string
+          maxLength: 1000
+          description: Overview of the competitive job market
+        data_freshness:
+          type: string
+          default: "Based on Aug 2025 data"
+          description: Indicates when the market data was last updated
+
+    SalaryRange:
+      type: object
+      required: [min, max, median, currency]
+      properties:
+        min:
+          type: integer
+          minimum: 0
+          example: 120000
+        max:
+          type: integer
+          minimum: 0
+          example: 180000
+        median:
+          type: integer
+          minimum: 0
+          example: 150000
+        currency:
+          type: string
+          maxLength: 3
+          default: "USD"
+        location_adjusted:
+          type: boolean
+          default: false
+          description: Whether the salary range has been adjusted for location
+
+    CareerPath:
+      type: object
+      required: [title, typical_years_to_reach]
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          example: "Engineering Manager"
+        typical_years_to_reach:
+          type: integer
+          minimum: 0
+          maximum: 30
+          example: 3
+          description: Typical years of experience needed to reach this role
+        required_skills:
+          type: array
+          items:
+            type: string
+        salary_increase_percent:
+          type: integer
+          minimum: 0
+          maximum: 200
+          description: Expected salary increase percentage compared to current role
+
+    # ==================== Health ====================
+    HealthResponse:
+      type: object
+      required: [status, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: "1.0.0"
+        dependencies:
+          type: object
+          properties:
+            neo4j:
+              type: string
+              enum: [connected, disconnected]
+            openai:
+              type: string
+              enum: [available, unavailable]
+
+    # ==================== Errors ====================
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          example: "validation_error"
+        message:
+          type: string
+          example: "Invalid file format. Supported formats: PDF, DOCX, TXT"
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "validation_error"
+            message: "Invalid request parameters"
+
+    SessionNotFound:
+      description: Session not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "not_found"
+            message: "Session not found or expired"
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until rate limit resets
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "rate_limit_exceeded"
+            message: "Too many requests. Please try again later."
+
+    FileTooLarge:
+      description: File size exceeds limit
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "file_too_large"
+            message: "File size exceeds 10MB limit"
+
+    UnsupportedMediaType:
+      description: Unsupported file type
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "unsupported_media_type"
+            message: "Unsupported file format. Supported: PDF, DOCX, TXT"
+
+  securitySchemes:
+    SessionToken:
+      type: apiKey
+      in: header
+      name: X-Session-ID
+      description: Session identifier for request tracking
