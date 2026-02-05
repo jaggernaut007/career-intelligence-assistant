@@ -616,3 +616,4 @@ Parallel execution via @step + ctx.send_event() reduces time by ~60%
    - More comprehensive session management from frontend.
    - Persistent memory for sessions and agents.
    - Memory for agents to improve context retention.
+   - Woudl implement Agent Lightning for a streamlines agent optimisation automation pipeline
