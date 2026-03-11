@@ -5,7 +5,6 @@ Loads configuration from environment variables with sensible defaults.
 """
 
 import logging
-import os
 from functools import lru_cache
 from typing import List, Optional
 
