@@ -224,7 +224,7 @@ describe('useWebSocket', () => {
         mockWebSocket.onclose?.(new CloseEvent('close'));
       });
 
-      expect(console.log).toHaveBeenCalledWith('WebSocket closed');
+      expect(console.log).toHaveBeenCalledWith('WebSocket closed', expect.anything(), expect.anything());
     });
 
     it('returns disconnect function', () => {

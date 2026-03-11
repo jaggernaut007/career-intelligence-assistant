@@ -48,6 +48,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Cleanup on shutdown
     logger.info("Shutting down Career Intelligence Assistant API...")
+    try:
+        from app.services.neo4j_store import get_neo4j_store
+        store = get_neo4j_store()
+        await store.aclose()
+        logger.info("Neo4j connections closed")
+    except Exception as e:
+        logger.warning(f"Error during Neo4j shutdown cleanup: {e}")
 
 
 # Create FastAPI app
@@ -76,6 +83,23 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def enforce_request_timeout(request: Request, call_next):
+    """Enforce a maximum request processing time to prevent hanging requests."""
+    timeout = settings.request_timeout
+    try:
+        return await asyncio.wait_for(call_next(request), timeout=timeout)
+    except asyncio.TimeoutError:
+        logger.warning(f"Request timed out after {timeout}s: {request.method} {request.url.path}")
+        return JSONResponse(
+            status_code=504,
+            content={
+                "error": "gateway_timeout",
+                "message": f"Request processing exceeded the maximum allowed time of {timeout}s",
+            },
+        )
 
 
 @app.middleware("http")

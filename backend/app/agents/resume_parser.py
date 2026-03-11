@@ -138,11 +138,17 @@ class ResumeParserAgent(BaseAgent):
             async def process_skill(skill: Skill) -> Skill:
                 """Check if skill matches an existing one via embedding similarity."""
                 try:
-                    embedding = await embedding_service.embed(f"Skill: {skill.name}")
-                    similar = await neo4j_store.find_similar_skills_by_embedding(
-                        embedding=embedding,
-                        threshold=threshold,
-                        limit=1
+                    embedding = await asyncio.wait_for(
+                        embedding_service.embed(f"Skill: {skill.name}"),
+                        timeout=10.0,
+                    )
+                    similar = await asyncio.wait_for(
+                        neo4j_store.find_similar_skills_by_embedding(
+                            embedding=embedding,
+                            threshold=threshold,
+                            limit=1
+                        ),
+                        timeout=10.0,
                     )
 
                     if similar and similar[0]["score"] > threshold:
@@ -160,12 +166,20 @@ class ResumeParserAgent(BaseAgent):
                             source=skill.source
                         )
                     return skill
+                except asyncio.TimeoutError:
+                    logger.warning(f"Timeout normalizing skill '{skill.name}', keeping original")
+                    return skill
                 except Exception as e:
                     logger.warning(f"Error normalizing skill '{skill.name}': {e}")
                     return skill
 
             # Process all skills in parallel for performance
-            deduplicated = await asyncio.gather(*[process_skill(s) for s in skills])
+            results = await asyncio.gather(*[process_skill(s) for s in skills], return_exceptions=True)
+            # Log any unexpected exceptions; inner try/except should prevent them
+            for r in results:
+                if not isinstance(r, Skill):
+                    logger.error(f"Unexpected exception during skill deduplication: {r}")
+            deduplicated = [r for r in results if isinstance(r, Skill)]
 
             # Remove duplicates that may have been created by normalization
             seen_names = set()

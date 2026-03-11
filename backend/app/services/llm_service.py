@@ -67,6 +67,10 @@ class LLMService:
                 max_completion_tokens=max_tokens,
             )
 
+            if not response.choices:
+                logger.error("LLM returned an empty choices list")
+                raise ValueError("LLM returned no completion choices")
+
             return response.choices[0].message.content or ""
 
         except Exception as e:

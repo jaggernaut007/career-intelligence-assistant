@@ -4,11 +4,15 @@ Application Configuration.
 Loads configuration from environment variables with sensible defaults.
 """
 
+import logging
+import os
 from functools import lru_cache
 from typing import List, Optional
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
+
+_config_logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -18,7 +22,7 @@ class Settings(BaseSettings):
     # OpenAI Configuration
     # ========================================================================
     openai_api_key: str = Field(..., description="OpenAI API key")
-    openai_model: str = Field("gpt-5.2", description="OpenAI model to use")
+    openai_model: str = Field("gpt-4o", description="OpenAI model to use")
 
     # ========================================================================
     # Neo4j Configuration
@@ -50,6 +54,7 @@ class Settings(BaseSettings):
     # ========================================================================
     host: str = Field("0.0.0.0", description="Server host")
     port: int = Field(8000, description="Server port")
+    request_timeout: int = Field(120, description="Maximum request processing time in seconds")
 
     # ========================================================================
     # Application Configuration
@@ -68,6 +73,21 @@ class Settings(BaseSettings):
     )
     log_level: str = Field("INFO", description="Logging level")
     environment: str = Field("development", description="Environment name")
+
+    # ========================================================================
+    # Validators
+    # ========================================================================
+
+    @field_validator("session_secret_key")
+    @classmethod
+    def warn_insecure_secret_key(cls, v: str) -> str:
+        """Warn if a default/insecure secret key is used."""
+        if v.startswith("dev-"):
+            _config_logger.warning(
+                "Insecure session_secret_key detected. "
+                "Set SESSION_SECRET_KEY to a strong random value in production."
+            )
+        return v
 
     # ========================================================================
     # Derived Properties

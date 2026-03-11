@@ -4,6 +4,7 @@ Base Agent Abstract Class.
 Defines the interface that all agents must implement.
 """
 
+import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -204,14 +205,19 @@ class BaseAgent(ABC):
 
         try:
             from app.api.websocket import broadcast_agent_progress
-            await broadcast_agent_progress(
-                session_id=self._session_id,
-                agent_name=self.name,
-                status=status,
-                progress=progress,
-                current_step=current_step,
-                error=error,
+            await asyncio.wait_for(
+                broadcast_agent_progress(
+                    session_id=self._session_id,
+                    agent_name=self.name,
+                    status=status,
+                    progress=progress,
+                    current_step=current_step,
+                    error=error,
+                ),
+                timeout=5.0,
             )
+        except asyncio.TimeoutError:
+            logger.warning(f"WebSocket broadcast timed out for agent '{self.name}'")
         except Exception as e:
             # Don't let WebSocket errors break agent execution
             logger.debug(f"Failed to broadcast progress: {e}")

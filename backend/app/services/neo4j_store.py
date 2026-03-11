@@ -88,15 +88,23 @@ class Neo4jStore:
             return False
 
     def close(self) -> None:
-        """Close Neo4j connection."""
+        """Close Neo4j synchronous connection."""
         if self._driver:
             self._driver.close()
             self._driver = None
-        if self._async_driver:
-            # Note: async close needs to be awaited
-            self._async_driver = None
         self._connected = False
-        logger.info("Neo4j connection closed")
+        logger.info("Neo4j sync connection closed")
+
+    async def aclose(self) -> None:
+        """Close both sync and async Neo4j connections."""
+        if self._async_driver:
+            try:
+                await self._async_driver.close()
+            except Exception as e:
+                logger.warning(f"Error closing Neo4j async driver: {e}")
+            finally:
+                self._async_driver = None
+        self.close()
 
     # ========================================================================
     # Resume Operations
