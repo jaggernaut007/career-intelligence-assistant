@@ -8,9 +8,15 @@ interface UseWebSocketOptions {
   onComplete?: () => void;
 }
 
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_BASE_DELAY_MS = 1000;
+const WS_NORMAL_CLOSURE = 1000;
+
 export function useWebSocket({ sessionId, enabled = true, onComplete }: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const isConnectingRef = useRef(false);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Store callbacks in refs to avoid dependency changes causing reconnects
   const onCompleteRef = useRef(onComplete);
@@ -36,6 +42,7 @@ export function useWebSocket({ sessionId, enabled = true, onComplete }: UseWebSo
     ws.onopen = () => {
       console.log('WebSocket connected');
       isConnectingRef.current = false;
+      reconnectAttemptsRef.current = 0;
     };
 
     ws.onmessage = (event) => {
@@ -78,30 +85,56 @@ export function useWebSocket({ sessionId, enabled = true, onComplete }: UseWebSo
       isConnectingRef.current = false;
     };
 
-    ws.onclose = () => {
-      console.log('WebSocket closed');
+    ws.onclose = (event) => {
+      console.log('WebSocket closed', event.code, event.reason);
       isConnectingRef.current = false;
       wsRef.current = null;
+
+      // Attempt reconnection with exponential backoff (skip on intentional close)
+      if (enabled && sessionId && event.code !== WS_NORMAL_CLOSURE && reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+        const delay = RECONNECT_BASE_DELAY_MS * Math.pow(2, reconnectAttemptsRef.current);
+        reconnectAttemptsRef.current += 1;
+        console.log(
+          `WebSocket reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`
+        );
+        reconnectTimerRef.current = setTimeout(() => {
+          connect();
+        }, delay);
+      }
     };
 
     wsRef.current = ws;
 
     return () => {
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-        ws.close();
+        ws.close(WS_NORMAL_CLOSURE, 'Component unmounted');
       }
     };
   // Only reconnect when sessionId or enabled changes, not on callback changes
   }, [sessionId, enabled, updateAgentStatus, setAnalyzing, setError]);
 
   useEffect(() => {
+    reconnectAttemptsRef.current = 0;
     const cleanup = connect();
-    return cleanup;
+    return () => {
+      // Cancel any pending reconnect timer
+      if (reconnectTimerRef.current !== null) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      cleanup?.();
+    };
   }, [connect]);
 
   const disconnect = useCallback(() => {
+    // Cancel any pending reconnect and prevent new reconnects
+    if (reconnectTimerRef.current !== null) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    reconnectAttemptsRef.current = MAX_RECONNECT_ATTEMPTS; // prevent further reconnects
     if (wsRef.current) {
-      wsRef.current.close();
+      wsRef.current.close(WS_NORMAL_CLOSURE, 'Intentional disconnect');
       wsRef.current = null;
     }
     isConnectingRef.current = false;
