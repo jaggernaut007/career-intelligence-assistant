@@ -20,6 +20,17 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
+# Models that use reasoning and don't support the temperature parameter
+REASONING_MODELS = ["o1", "o1-mini", "o1-preview", "o3", "o3-mini", "o4-mini"]
+
+
+def _is_reasoning_model(model_name: str) -> bool:
+    """Check if a model is a reasoning model (no temperature support)."""
+    return any(
+        rm == model_name or model_name.startswith(rm + "-")
+        for rm in REASONING_MODELS
+    )
+
 
 class LlamaIndexService:
     """
@@ -68,8 +79,7 @@ class LlamaIndexService:
                 "max_retries": 3,  # Retry on transient failures
             }
             # Only set temperature for models that support it (not reasoning models)
-            reasoning_models = ["o1", "o1-mini", "o1-preview", "o3", "o3-mini", "o4-mini"]
-            if not any(rm == settings.openai_model or settings.openai_model.startswith(rm + "-") for rm in reasoning_models):
+            if not _is_reasoning_model(settings.openai_model):
                 llm_kwargs["temperature"] = 0.3
             self._llm = LlamaOpenAI(**llm_kwargs)
 
@@ -149,9 +159,8 @@ class LlamaIndexService:
 
             # Check if model supports temperature
             settings = get_settings()
-            reasoning_models = ["o1", "o1-mini", "o1-preview", "o3", "o3-mini", "o4-mini"]
 
-            if any(rm == settings.openai_model or settings.openai_model.startswith(rm + "-") for rm in reasoning_models):
+            if _is_reasoning_model(settings.openai_model):
                 # Reasoning models don't support temperature
                 response = await self._llm.achat(messages)
             else:
@@ -804,6 +813,11 @@ def set_session_api_key(api_key: Optional[str]) -> contextvars.Token:
         Token to reset the context variable
     """
     return _current_api_key.set(api_key)
+
+
+def reset_session_api_key(token: contextvars.Token) -> None:
+    """Reset the per-session API key context variable."""
+    _current_api_key.reset(token)
 
 
 async def get_llamaindex_service_for_session(

@@ -4,6 +4,7 @@ API Routes.
 REST API endpoints for the Career Intelligence Assistant.
 """
 
+import hmac
 import logging
 import uuid
 from datetime import datetime
@@ -116,6 +117,9 @@ class SessionResponse(BaseModel):
     session_id: str
     created_at: str
     expires_at: str
+    auth_methods: List[str] = Field(
+        default_factory=list, description="Available authentication methods"
+    )
 
 
 class ResumeUploadResponse(BaseModel):
@@ -207,10 +211,15 @@ async def create_session(
     """Create a new analysis session."""
     session = session_manager.create_session()
 
+    auth_methods = ["apikey"]
+    if settings.app_password:
+        auth_methods.insert(0, "password")
+
     return SessionResponse(
         session_id=session.session_id,
         created_at=session.created_at.isoformat(),
         expires_at=session.expires_at.isoformat(),
+        auth_methods=auth_methods,
     )
 
 
@@ -253,6 +262,124 @@ async def delete_session(
 
 
 # ============================================================================
+# API Key Endpoints
+# ============================================================================
+
+class SetApiKeyRequest(BaseModel):
+    """Request to set OpenAI API key for the session."""
+    api_key: str = Field(
+        ..., min_length=1, max_length=200, description="OpenAI API key"
+    )
+
+
+class SetApiKeyResponse(BaseModel):
+    """Response after setting API key."""
+    valid: bool
+    message: str
+
+
+@router.post(
+    "/session/api-key",
+    response_model=SetApiKeyResponse,
+    summary="Set OpenAI API key",
+    description="Set the OpenAI API key for the current session.",
+)
+@limiter.limit("10/minute")
+async def set_api_key(
+    request: Request,
+    body: SetApiKeyRequest,
+    session: SessionData = Depends(get_session),
+    session_manager: SessionManager = Depends(get_session_manager),
+) -> SetApiKeyResponse:
+    """Set and validate OpenAI API key for the session."""
+    api_key = body.api_key.strip()
+
+    # Basic format validation
+    if not api_key.startswith("sk-"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid API key format. OpenAI keys start with 'sk-'.",
+        )
+
+    # Validate the key by making a lightweight API call
+    try:
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(api_key=api_key)
+        await client.models.list()
+    except Exception as e:
+        logger.warning(
+            f"Invalid OpenAI API key provided for session {session.session_id}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid OpenAI API key. Please check your key and try again.",
+        )
+
+    # Store in session
+    session_manager.set_api_key(
+        session_id=session.session_id,
+        api_key=api_key,
+    )
+
+    return SetApiKeyResponse(valid=True, message="API key validated and set.")
+
+
+class PasswordLoginRequest(BaseModel):
+    """Request to login with application password."""
+    password: str = Field(
+        ..., min_length=1, max_length=200, description="Application password"
+    )
+
+
+@router.post(
+    "/session/password-login",
+    response_model=SetApiKeyResponse,
+    summary="Login with password",
+    description="Login using the application password. Uses the server-side OpenAI API key.",
+)
+@limiter.limit("5/minute")
+async def password_login(
+    request: Request,
+    body: PasswordLoginRequest,
+    session: SessionData = Depends(get_session),
+    session_manager: SessionManager = Depends(get_session_manager),
+) -> SetApiKeyResponse:
+    """Validate password and use server-side API key for the session."""
+    app_password = settings.app_password
+    if not app_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Password login is not configured on this server.",
+        )
+
+    if not hmac.compare_digest(body.password.strip(), app_password):
+        logger.warning(
+            f"Invalid password attempt for session {session.session_id}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid password.",
+        )
+
+    # Verify server-side API key is configured
+    server_api_key = settings.openai_api_key
+    if not server_api_key or not server_api_key.startswith("sk-"):
+        logger.error("Password login succeeded but server OPENAI_API_KEY is not configured")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Server API key is not configured. Contact the administrator.",
+        )
+
+    session_manager.set_api_key(
+        session_id=session.session_id,
+        api_key=server_api_key,
+    )
+
+    return SetApiKeyResponse(valid=True, message="Logged in successfully.")
+
+
+# ============================================================================
 # Upload Endpoints
 # ============================================================================
 
@@ -271,6 +398,13 @@ async def upload_resume(
     session_manager: SessionManager = Depends(get_session_manager),
 ) -> ResumeUploadResponse:
     """Upload and parse a resume."""
+    # Require API key before upload
+    if not session.openai_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OpenAI API key required. Please set your API key before uploading.",
+        )
+
     # Validate file
     input_validator = get_input_validator()
 
@@ -338,9 +472,17 @@ async def upload_resume(
     pii_detector = get_pii_detector()
     redacted_text = pii_detector.redact(resume_text)
 
-    # Parse resume with LLM
+    # Parse resume with LLM (using session's API key if provided)
+    api_key_token = None
     try:
-        from app.services.llamaindex_service import get_llamaindex_service
+        from app.services.llamaindex_service import (
+            get_llamaindex_service,
+            set_session_api_key,
+            reset_session_api_key,
+        )
+
+        if session.openai_api_key:
+            api_key_token = set_session_api_key(session.openai_api_key)
         llamaindex_service = await get_llamaindex_service()
         parsed_resume = await llamaindex_service.parse_resume(redacted_text)
     except Exception as e:
@@ -349,6 +491,9 @@ async def upload_resume(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to analyze resume",
         )
+    finally:
+        if api_key_token is not None:
+            reset_session_api_key(api_key_token)
 
     # Generate resume ID
     resume_id = f"resume-{uuid.uuid4().hex[:8]}"
@@ -429,6 +574,13 @@ async def upload_job_description(
     session_manager: SessionManager = Depends(get_session_manager),
 ) -> JobDescriptionUploadResponse:
     """Upload and parse a job description."""
+    # Require API key
+    if not session.openai_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OpenAI API key required. Please set your API key first.",
+        )
+
     # Check JD limit
     if len(session.job_descriptions) >= session_manager.MAX_JDS_PER_SESSION:
         raise HTTPException(
@@ -501,9 +653,17 @@ async def upload_job_description(
             detail=f"Content failed security validation: {injection_error}",
         )
 
-    # Parse JD with LLM
+    # Parse JD with LLM (using session's API key if provided)
+    api_key_token = None
     try:
-        from app.services.llamaindex_service import get_llamaindex_service
+        from app.services.llamaindex_service import (
+            get_llamaindex_service,
+            set_session_api_key,
+            reset_session_api_key,
+        )
+
+        if session.openai_api_key:
+            api_key_token = set_session_api_key(session.openai_api_key)
         llamaindex_service = await get_llamaindex_service()
         parsed_jd = await llamaindex_service.parse_job_description(jd_text)
     except Exception as e:
@@ -512,6 +672,9 @@ async def upload_job_description(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to analyze job description",
         )
+    finally:
+        if api_key_token is not None:
+            reset_session_api_key(api_key_token)
 
     # Generate job ID
     job_id = f"job-{uuid.uuid4().hex[:8]}"
@@ -637,8 +800,16 @@ async def analyze(
     session.analysis_started_at = datetime.utcnow()
     session_manager.update_session(session)
 
+    # Capture session's API key for the background task
+    session_api_key = session.openai_api_key
+
     # Run analysis in background using LlamaIndex Workflow
     async def run_analysis():
+        # Set per-session API key in background task context
+        api_key_token = None
+        if session_api_key:
+            from app.services.llamaindex_service import set_session_api_key
+            api_key_token = set_session_api_key(session_api_key)
         try:
             from app.workflows import CareerAnalysisWorkflow, StartAnalysisEvent
 
@@ -690,6 +861,11 @@ async def analyze(
                 await broadcast_analysis_complete(sid, success=False, error=str(e))
             except Exception:
                 pass  # WebSocket broadcast is optional
+        finally:
+            # Reset per-session API key context
+            if api_key_token is not None:
+                from app.services.llamaindex_service import reset_session_api_key
+                reset_session_api_key(api_key_token)
 
     background_tasks.add_task(run_analysis)
 
@@ -945,6 +1121,12 @@ async def chat(
             detail=f"Message failed security validation: {injection_error}",
         )
 
+    # Set per-session API key for chat agent
+    api_key_token = None
+    if session.openai_api_key:
+        from app.services.llamaindex_service import set_session_api_key, reset_session_api_key
+        api_key_token = set_session_api_key(session.openai_api_key)
+
     # Run chat agent
     try:
         from app.agents.chat_fit import ChatFitAgent, ChatFitInput
@@ -981,3 +1163,7 @@ async def chat(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to process chat request",
         )
+    finally:
+        if api_key_token is not None:
+            from app.services.llamaindex_service import reset_session_api_key
+            reset_session_api_key(api_key_token)
