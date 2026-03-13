@@ -1,0 +1,62 @@
+{
+  "project": "career-intelligence-assistant",
+  "last_updated": "2026-03-13",
+  "features": [
+    {
+      "id": "F001",
+      "name": "Resume Parsing",
+      "status": "complete",
+      "agent": "resume_parser",
+      "tests": "backend/tests/unit/test_resume_parser.py"
+    },
+    {
+      "id": "F002",
+      "name": "JD Analysis",
+      "status": "complete",
+      "agent": "jd_analyzer",
+      "tests": "backend/tests/unit/test_jd_analyzer.py"
+    },
+    {
+      "id": "F003",
+      "name": "Skill Matching",
+      "status": "complete",
+      "agent": "skill_matcher",
+      "tests": "backend/tests/unit/test_skill_matcher.py"
+    },
+    {
+      "id": "F004",
+      "name": "Chat Fit Analysis",
+      "status": "complete",
+      "agent": "chat_fit",
+      "tests": "backend/tests/unit/test_chat_fit.py"
+    },
+    {
+      "id": "F005",
+      "name": "Interview Prep",
+      "status": "complete",
+      "agent": "interview_prep",
+      "tests": "backend/tests/unit/test_interview_prep.py"
+    },
+    {
+      "id": "F006",
+      "name": "Market Insights",
+      "status": "complete",
+      "agent": "market_insights",
+      "tests": "backend/tests/unit/test_market_insights.py"
+    },
+    {
+      "id": "F007",
+      "name": "Recommendations",
+      "status": "complete",
+      "agent": "recommendation",
+      "tests": "backend/tests/unit/test_recommendation.py"
+    },
+    {
+      "id": "F008",
+      "name": "Analysis Workflow",
+      "status": "complete",
+      "agent": "analysis_workflow",
+      "tests": "backend/tests/unit/test_analysis_workflow.py"
+    }
+  ]
+}

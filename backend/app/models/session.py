@@ -5,6 +5,8 @@ In-memory session storage for demo/portfolio purposes.
 Can be upgraded to Redis for production.
 """
 
+import base64
+import hashlib
 import logging
 import uuid
 from dataclasses import dataclass, field
@@ -12,7 +14,40 @@ from datetime import datetime, timedelta
 from threading import Lock
 from typing import Dict, List, Optional, Any
 
+from cryptography.fernet import Fernet
+
 logger = logging.getLogger(__name__)
+
+_fernet_instance: Optional[Fernet] = None
+
+
+def _get_fernet() -> Fernet:
+    """Get or create a Fernet instance derived from the session secret."""
+    global _fernet_instance
+    if _fernet_instance is None:
+        from app.config import get_settings
+        secret = get_settings().session_secret_key
+        # Fernet requires a 32-byte URL-safe base64-encoded key
+        key_bytes = hashlib.sha256(secret.encode()).digest()
+        fernet_key = base64.urlsafe_b64encode(key_bytes)
+        _fernet_instance = Fernet(fernet_key)
+    return _fernet_instance
+
+
+def _encrypt_value(plaintext: str) -> str:
+    """Encrypt a string using Fernet (AES-128-CBC + HMAC-SHA256).
+
+    Each call produces a unique ciphertext due to Fernet's built-in
+    random IV. The ciphertext is also timestamped internally.
+    """
+    fernet = _get_fernet()
+    return fernet.encrypt(plaintext.encode()).decode()
+
+
+def _decrypt_value(encrypted_str: str) -> str:
+    """Decrypt a Fernet-encrypted value."""
+    fernet = _get_fernet()
+    return fernet.decrypt(encrypted_str.encode()).decode()
 
 
 @dataclass
@@ -21,6 +56,9 @@ class SessionData:
     session_id: str
     created_at: datetime = field(default_factory=datetime.utcnow)
     expires_at: datetime = field(default_factory=lambda: datetime.utcnow() + timedelta(hours=1))
+
+    # User-provided OpenAI API key (encrypted at rest)
+    _encrypted_api_key: Optional[str] = field(default=None, repr=False)
 
     # Uploaded data
     resume_id: Optional[str] = None
@@ -43,6 +81,39 @@ class SessionData:
 
     # Agent progress tracking
     agent_progress: Dict[str, Dict[str, Any]] = field(default_factory=dict)  # agent_name -> status
+
+    @property
+    def openai_api_key(self) -> Optional[str]:
+        """Decrypt and return the API key."""
+        if self._encrypted_api_key is None:
+            return None
+        try:
+            return _decrypt_value(self._encrypted_api_key)
+        except Exception:
+            return None
+
+    @openai_api_key.setter
+    def openai_api_key(self, value: Optional[str]) -> None:
+        """Encrypt and store the API key."""
+        if value is None:
+            self._encrypted_api_key = None
+        else:
+            self._encrypted_api_key = _encrypt_value(value)
+
+    @property
+    def has_api_key(self) -> bool:
+        """Check if an API key is set without decrypting."""
+        return self._encrypted_api_key is not None
+
+    def __repr__(self) -> str:
+        """Safe repr that masks sensitive fields."""
+        key_status = "set" if self._encrypted_api_key else "not set"
+        return (
+            f"SessionData(session_id={self.session_id!r}, "
+            f"api_key={key_status}, "
+            f"has_resume={self.resume_id is not None}, "
+            f"analysis_status={self.analysis_status!r})"
+        )
 
     def is_expired(self) -> bool:
         """Check if session has expired."""
@@ -159,6 +230,25 @@ class SessionManager:
                 logger.info(f"Deleted session: {session_id}")
                 return True
             return False
+
+    def set_api_key(self, session_id: str, api_key: str) -> bool:
+        """
+        Set OpenAI API key for a session.
+
+        Args:
+            session_id: Session identifier
+            api_key: OpenAI API key
+
+        Returns:
+            True if successful, False if session not found
+        """
+        session = self.get_session(session_id)
+        if session is None:
+            return False
+
+        session.openai_api_key = api_key
+        self.update_session(session)
+        return True
 
     def set_resume(
         self,

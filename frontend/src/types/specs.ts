@@ -242,6 +242,7 @@ export interface Session {
   sessionId: string;
   createdAt: string;
   expiresAt: string;
+  authMethods: string[];
 }
 
 export interface SessionState {
@@ -382,8 +383,17 @@ export interface ApiConfig {
   timeout: number;
 }
 
+const getWsUrl = (): string => {
+  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
+  if (typeof window !== 'undefined' && !import.meta.env.VITE_API_URL) {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}`;
+  }
+  return 'ws://localhost:8000';
+};
+
 export const DEFAULT_API_CONFIG: ApiConfig = {
-  baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000',
-  wsUrl: import.meta.env.VITE_WS_URL || 'ws://localhost:8000',
+  baseUrl: import.meta.env.VITE_API_URL || '',
+  wsUrl: getWsUrl(),
   timeout: 30000,
 };

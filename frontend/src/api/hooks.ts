@@ -54,6 +54,71 @@ export function useCreateSession() {
   });
 }
 
+// Logout (delete session and clear all state)
+export function useLogout() {
+  const session = useSessionStore((s) => s.session);
+  const clearSession = useSessionStore((s) => s.clearSession);
+
+  return useMutation({
+    mutationFn: async () => {
+      if (session?.sessionId) {
+        await apiClient.delete(`/api/v1/session/${session.sessionId}`);
+      }
+    },
+    onSettled: () => {
+      // Always clear local state, even if backend call fails
+      clearSession();
+      const { clearAll } = useAnalysisStore.getState();
+      const { reset } = useWizardStore.getState();
+      clearAll();
+      reset();
+    },
+  });
+}
+
+// Set OpenAI API Key
+export function useSetApiKey() {
+  const setApiKeyValidated = useSessionStore((s) => s.setApiKeyValidated);
+
+  return useMutation({
+    mutationFn: async (apiKey: string) => {
+      const response = await apiClient.post('/api/v1/session/api-key', {
+        api_key: apiKey,
+      });
+      return response.data as { valid: boolean; message: string };
+    },
+    onSuccess: (data) => {
+      if (data.valid) {
+        setApiKeyValidated(true);
+      }
+    },
+    onError: () => {
+      setApiKeyValidated(false);
+    },
+  });
+}
+
+export function usePasswordLogin() {
+  const setApiKeyValidated = useSessionStore((s) => s.setApiKeyValidated);
+
+  return useMutation({
+    mutationFn: async (password: string) => {
+      const response = await apiClient.post('/api/v1/session/password-login', {
+        password,
+      });
+      return response.data as { valid: boolean; message: string };
+    },
+    onSuccess: (data) => {
+      if (data.valid) {
+        setApiKeyValidated(true);
+      }
+    },
+    onError: () => {
+      setApiKeyValidated(false);
+    },
+  });
+}
+
 // Resume Upload
 export function useUploadResume() {
   const setResume = useAnalysisStore((s) => s.setResume);

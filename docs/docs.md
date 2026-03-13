@@ -9,6 +9,7 @@ Welcome to the Career Intelligence Assistant documentation. This multi-agent AI 
 | [Quick Start](getting-started/quick-start.md) | Get running in 5 minutes |
 | [Architecture Overview](architecture/overview.md) | System design and data flow |
 | [API Reference](backend/api-reference.md) | REST API endpoints |
+| [Security & Guardrails](backend/security.md) | 6-layer security architecture |
 | [Deployment Guide](deployment/gcp-cloud-run.md) | Production deployment |
 
 ## Documentation Structure
@@ -23,6 +24,7 @@ docs/
 │   └── database-schema.md      # Neo4j graph schema
 ├── backend/
 │   ├── api-reference.md        # REST API docs
+│   ├── security.md             # 6-layer security architecture
 │   ├── agents.md               # AI agent documentation
 │   └── services.md             # Core services
 ├── frontend/
@@ -86,8 +88,11 @@ Required environment variables:
 | `NEO4J_URI` | Neo4j AuraDB connection URI |
 | `NEO4J_USERNAME` | Neo4j username |
 | `NEO4J_PASSWORD` | Neo4j password |
-| `OPENAI_API_KEY` | OpenAI API key |
+| `APP_PASSWORD` | Application password for login *(optional — enables password login)* |
+| `SESSION_SECRET_KEY` | Secret for Fernet encryption of API keys (64+ char random string) |
 | `HF_TOKEN` | HuggingFace token for embeddings |
+
+> **Note**: `OPENAI_API_KEY` is no longer a server-side environment variable. Each user provides their own OpenAI API key at login, which is encrypted in-memory for the session duration. See [Security Documentation](backend/security.md#layer-6-api-key-encryption--session-security) for details.
 
 ### Development Mode
 

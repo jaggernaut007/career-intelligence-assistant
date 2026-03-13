@@ -23,7 +23,44 @@ See also: [specs/openapi.yaml](../../specs/openapi.yaml)
 
 ## Authentication
 
-Currently, the API uses session-based identification (no authentication required). Sessions are created automatically and tracked via session ID.
+The API uses **session-based authentication** with two login methods:
+
+### Login Methods
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| **Password** | `POST /session/password-login` | Uses the server-configured `OPENAI_API_KEY` |
+| **API Key** | `POST /session/api-key` | User provides their own OpenAI API key |
+
+Available methods are returned in the `auth_methods` field of the `POST /session` response.
+
+### Login Flow (Password)
+
+1. Client creates a session via `POST /api/v1/session` (response includes `auth_methods`)
+2. Client submits password via `POST /api/v1/session/password-login`
+3. Backend validates with timing-safe comparison (`hmac.compare_digest`)
+4. On success, the server's `OPENAI_API_KEY` is encrypted and stored in the session
+
+### Login Flow (API Key)
+
+1. Client creates a session via `POST /api/v1/session`
+2. Client submits an OpenAI API key via `POST /api/v1/session/api-key`
+3. Backend validates the key against the OpenAI API (`models.list()`)
+4. On success, the key is encrypted with Fernet (AES-128-CBC + HMAC-SHA256) and stored in the session
+5. All subsequent LLM calls use the session's encrypted API key
+
+### Logout Flow
+
+1. Client calls `DELETE /api/v1/session/{session_id}`
+2. Backend destroys the session, including the encrypted API key and all uploaded data
+3. Frontend clears all local state (Zustand stores, sessionStorage)
+
+### Session Lifecycle
+
+- Sessions auto-expire after **1 hour**
+- API keys are **never stored permanently** — only in-memory for the session duration
+- The raw API key is **never returned** in any API response
+- The frontend stores only a `apiKeyValidated: boolean` flag, never the raw key
 
 ---
 
@@ -38,6 +75,8 @@ Rate limiting is enforced using **slowapi** to prevent API abuse.
 ### Rate-Limited Endpoints
 
 - `POST /api/v1/session` - Create session
+- `POST /api/v1/session/api-key` - Set API key
+- `POST /api/v1/session/password-login` - Password login (5/minute)
 - `POST /api/v1/upload/resume` - Upload resume
 - `POST /api/v1/upload/job-description` - Add job description
 - `POST /api/v1/analyze` - Start analysis
@@ -95,9 +134,13 @@ POST /api/v1/session
 ```json
 {
   "session_id": "550e8400-e29b-41d4-a716-446655440000",
-  "created_at": "2024-01-31T12:00:00Z"
+  "created_at": "2024-01-31T12:00:00Z",
+  "expires_at": "2024-01-31T13:00:00Z",
+  "auth_methods": ["password", "apikey"]
 }
 ```
+
+The `auth_methods` field indicates which login methods are available. `"password"` is included only when `APP_PASSWORD` is configured on the server.
 
 #### Get Session Status
 
@@ -116,17 +159,91 @@ GET /api/v1/session/{session_id}
 }
 ```
 
-#### Delete Session
+#### Set API Key
+
+```http
+POST /api/v1/session/api-key
+Content-Type: application/json
+```
+
+**Request Body**:
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "api_key": "sk-..."
+}
+```
+
+**Response** `200 OK`:
+```json
+{
+  "valid": true,
+  "message": "API key validated and set."
+}
+```
+
+**Validation**:
+- Key must start with `sk-`
+- Key is validated against OpenAI API (`models.list()`)
+- On success, key is Fernet-encrypted and stored in session memory
+
+**Error Responses**:
+- `400 Bad Request` — Invalid key format (does not start with `sk-`)
+- `401 Unauthorized` — Key failed OpenAI API validation
+
+**Rate Limit**: 10 requests/minute per IP
+
+> **Note**: Resume upload and job description upload require a valid API key to be set first (via either login method). Attempting to upload without one returns `400 Bad Request`.
+
+#### Password Login
+
+```http
+POST /api/v1/session/password-login
+Content-Type: application/json
+```
+
+**Request Body**:
+```json
+{
+  "password": "your-password"
+}
+```
+
+**Response** `200 OK`:
+```json
+{
+  "valid": true,
+  "message": "Logged in successfully."
+}
+```
+
+**Validation**:
+- Password is compared using timing-safe `hmac.compare_digest` (prevents timing attacks)
+- On success, the server's `OPENAI_API_KEY` is Fernet-encrypted and stored in the session
+- Server verifies its own API key is valid before assigning it
+
+**Error Responses**:
+- `401 Unauthorized` — Invalid password
+- `403 Forbidden` — Password login not configured (`APP_PASSWORD` not set)
+- `503 Service Unavailable` — Server API key not configured
+
+**Rate Limit**: 5 requests/minute per IP (stricter than other endpoints)
+
+#### Delete Session (Logout)
 
 ```http
 DELETE /api/v1/session/{session_id}
 ```
+
+Destroys the session along with all associated data: encrypted API key, uploaded resume, job descriptions, analysis results, and agent progress.
 
 **Response** `204 No Content`
 
 ---
 
 ### Document Upload
+
+> **Prerequisite**: A valid API key must be set via `POST /api/v1/session/api-key` before uploading documents.
 
 #### Upload Resume
 

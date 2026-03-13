@@ -1,63 +1,36 @@
-import { useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { useCreateSession } from '@/api/hooks';
 import { useSessionStore } from '@/store';
 import { WizardContainer } from '@/components/wizard/WizardContainer';
+import { LoginScreen } from '@/components/common/LoginScreen';
+import { Header } from '@/components/common/Header';
 import { Spinner } from '@/components/ui/Spinner';
-import { Alert } from '@/components/ui/Alert';
-import { Button } from '@/components/ui/Button';
+import { Routes, Route } from 'react-router-dom';
 
 function AppContent() {
   const session = useSessionStore((s) => s.session);
+  const apiKeyValidated = useSessionStore((s) => s.apiKeyValidated);
   const isInitializing = useSessionStore((s) => s.isInitializing);
-  const error = useSessionStore((s) => s.error);
-  const createSession = useCreateSession();
 
-  useEffect(() => {
-    if (!session && !isInitializing) {
-      createSession.mutate();
+  // Show login screen if no session or API key not validated
+  if (!session || !apiKeyValidated) {
+    if (isInitializing) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <Spinner size="lg" />
+            <p className="mt-4 text-gray-600">Signing in...</p>
+          </div>
+        </div>
+      );
     }
-  }, [session, isInitializing]);
-
-  if (isInitializing) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Spinner size="lg" />
-          <p className="mt-4 text-gray-600">Initializing session...</p>
-        </div>
-      </div>
-    );
+    return <LoginScreen />;
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="max-w-md w-full">
-          <Alert variant="error" title="Session Error">
-            {error}
-          </Alert>
-          <Button
-            className="mt-4 w-full"
-            onClick={() => createSession.mutate()}
-            isLoading={createSession.isPending}
-          >
-            Try Again
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!session) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
-
-  return <WizardContainer />;
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      <WizardContainer />
+    </div>
+  );
 }
 
 function App() {

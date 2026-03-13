@@ -1,18 +1,18 @@
 # Security & Guardrails
 
-The Career Intelligence Assistant implements a comprehensive 5-layer security architecture to ensure safe and reliable AI interactions.
+The Career Intelligence Assistant implements a comprehensive 6-layer security architecture to ensure safe and reliable AI interactions.
 
 ## Security Layers Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         5-LAYER SECURITY GUARDRAILS                          │
-│  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────────┐  │
-│  │   PII     │ │  Prompt   │ │   Input   │ │   Rate    │ │    Output     │  │
-│  │ Detection │→│ Injection │→│Validation │→│ Limiting  │→│   Filtering   │  │
-│  │(Presidio) │ │   Guard   │ │(File/Size)│ │ (slowapi) │ │(Sanitization) │  │
-│  └───────────┘ └───────────┘ └───────────┘ └───────────┘ └───────────────┘  │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                          6-LAYER SECURITY GUARDRAILS                             │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ │
+│  │   PII    │ │  Prompt  │ │  Input   │ │   Rate   │ │  Output  │ │  API Key │ │
+│  │Detection │→│Injection │→│Validate  │→│ Limiting │→│ Filtering│→│Encryption│ │
+│  │(Presidio)│ │  Guard   │ │(File/Sz) │ │ (slowapi)│ │(Sanitize)│ │ (Fernet) │ │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ │
+└──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -140,6 +140,8 @@ async def create_session(request: Request):
 | Endpoint | Method | Limit |
 |----------|--------|-------|
 | `/api/v1/session` | POST | 10/minute |
+| `/api/v1/session/api-key` | POST | 10/minute |
+| `/api/v1/session/password-login` | POST | **5/minute** |
 | `/api/v1/upload/resume` | POST | 10/minute |
 | `/api/v1/upload/job-description` | POST | 10/minute |
 | `/api/v1/analyze` | POST | 10/minute |
@@ -191,6 +193,102 @@ Sanitizes LLM responses before returning to the frontend.
 
 ---
 
+## Layer 6: API Key Encryption & Session Security
+
+**Location**: `backend/app/models/session.py`
+
+Per-session OpenAI API keys are encrypted at rest using Fernet symmetric encryption (AES-128-CBC + HMAC-SHA256).
+
+### Encryption Architecture
+
+```
+User submits API key
+        │
+        ▼
+┌──────────────────────┐
+│  Format validation   │  Must start with "sk-"
+│  (sk-* prefix check) │
+└──────────┬───────────┘
+           ▼
+┌──────────────────────┐
+│  OpenAI API check    │  client.models.list()
+│  (live validation)   │
+└──────────┬───────────┘
+           ▼
+┌──────────────────────┐
+│  Fernet encryption   │  AES-128-CBC + HMAC-SHA256
+│  (unique IV per call)│  Derived from SESSION_SECRET_KEY
+└──────────┬───────────┘
+           ▼
+┌──────────────────────┐
+│  In-memory storage   │  SessionData._encrypted_api_key
+│  (never persisted)   │  Auto-deleted on session expiry
+└──────────────────────┘
+```
+
+### Key Derivation
+
+The Fernet key is derived from `SESSION_SECRET_KEY` via SHA-256:
+
+```python
+key_bytes = hashlib.sha256(secret.encode()).digest()
+fernet_key = base64.urlsafe_b64encode(key_bytes)
+```
+
+### Security Properties
+
+| Property | Implementation |
+|----------|----------------|
+| **Encryption algorithm** | Fernet (AES-128-CBC + HMAC-SHA256) |
+| **IV uniqueness** | Fernet generates a random IV per encryption call |
+| **Key derivation** | SHA-256 of `SESSION_SECRET_KEY` |
+| **Storage** | In-memory only; never written to disk or database |
+| **Lifetime** | Destroyed on logout (`DELETE /session`) or session expiry (1 hour) |
+| **Logging** | API key is **never** logged; only session ID appears in logs |
+| **`__repr__` safety** | `SessionData.__repr__` shows `api_key=set` or `api_key=not set` |
+| **Frontend exposure** | Frontend stores only `apiKeyValidated: boolean`, never the raw key |
+
+### Password Authentication
+
+The system supports an optional password-based login (`APP_PASSWORD` env var) as an alternative to direct API key entry.
+
+| Property | Implementation |
+|----------|----------------|
+| **Comparison** | Timing-safe `hmac.compare_digest` (prevents timing side-channel attacks) |
+| **Rate limit** | 5 attempts/minute per IP (stricter than other endpoints) |
+| **Server key guard** | Verifies `OPENAI_API_KEY` exists and starts with `sk-` before assigning |
+| **Input normalization** | Password is `.strip()`-ed before comparison |
+| **Failure logging** | Logs session ID only, never the attempted password |
+| **Availability detection** | `POST /session` returns `auth_methods` so the frontend only shows password login when configured |
+
+### Per-Session LLM Service Instances
+
+Each unique API key gets its own `LlamaIndexService` instance via a bounded cache:
+
+```python
+_session_services: Dict[str, LlamaIndexService] = {}  # SHA-256(key) → service
+_MAX_SESSION_SERVICES = 50  # FIFO eviction when full
+```
+
+- Cache keys are **SHA-256 hashes** of the API key (raw key never used as dict key)
+- Access is protected by `asyncio.Lock` to prevent race conditions
+- Context variable (`contextvars.ContextVar`) propagates the session API key through the agent call chain
+
+### HTTP Security Headers
+
+The backend adds security headers to all responses:
+
+| Header | Value | Purpose |
+|--------|-------|---------|
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | Force HTTPS |
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self'` | Prevent XSS |
+| `Cache-Control` | `no-store, no-cache, must-revalidate, private` | Prevent caching of API responses |
+| `Pragma` | `no-cache` | HTTP/1.0 cache prevention |
+
+> `Cache-Control` and `Pragma` are applied only to `/api/` routes.
+
+---
+
 ## Security Configuration
 
 ### Environment Variables
@@ -200,12 +298,15 @@ Sanitizes LLM responses before returning to the frontend.
 | `RATE_LIMIT_PER_MINUTE` | Requests per minute per IP | 10 |
 | `MAX_FILE_SIZE_MB` | Maximum upload file size | 10 |
 | `MAX_CONTENT_LENGTH` | Maximum text content length | 50000 |
+| `APP_PASSWORD` | Application password for password-based login | *(optional — enables password login)* |
+| `SESSION_SECRET_KEY` | Secret used to derive Fernet encryption key | *(required — use a 64+ char random string)* |
 
 ### Production Hardening
 
 For production deployments:
 
-1. **Change session secret**: Set `SESSION_SECRET_KEY` to a secure random value
+1. **Change session secret**: Set `SESSION_SECRET_KEY` to a cryptographically random value (e.g., `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`)
+
 2. **Restrict CORS**: Configure `CORS_ORIGINS` to allowed domains only
 3. **Enable HTTPS**: Use `neo4j+s://` protocol for database connections
 4. **Monitor rate limits**: Track 429 responses in logging/monitoring
