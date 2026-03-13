@@ -5,6 +5,9 @@ Provides unified access to LlamaIndex LLM, embeddings, and stores.
 All LLM calls should go through this service - never call OpenAI directly.
 """
 
+import asyncio
+import contextvars
+import hashlib
 import json
 import logging
 from typing import Any, Dict, List, Optional, Type, TypeVar
@@ -30,11 +33,17 @@ class LlamaIndexService:
     Skill embeddings are stored on Skill nodes for semantic matching.
     """
 
-    def __init__(self):
-        """Initialize service (lazy loading)."""
+    def __init__(self, api_key: str | None = None):
+        """Initialize service (lazy loading).
+
+        Args:
+            api_key: Optional OpenAI API key override (per-session).
+                     Falls back to environment config if not provided.
+        """
         self._llm = None
         self._embed_model = None
         self._initialized = False
+        self._api_key_override = api_key
 
     async def initialize(self) -> None:
         """Initialize all LlamaIndex components."""
@@ -42,6 +51,7 @@ class LlamaIndexService:
             return
 
         settings = get_settings()
+        api_key = self._api_key_override or settings.openai_api_key
 
         try:
             # Import LlamaIndex components
@@ -53,13 +63,13 @@ class LlamaIndexService:
             logger.info(f"Initializing LlamaIndex LLM: {settings.openai_model}")
             llm_kwargs = {
                 "model": settings.openai_model,
-                "api_key": settings.openai_api_key,
+                "api_key": api_key,
                 "timeout": 120.0,  # 2 minute timeout for complex prompts
                 "max_retries": 3,  # Retry on transient failures
             }
             # Only set temperature for models that support it (not reasoning models)
-            reasoning_models = ["o1", "o1-mini", "o1-preview", "gpt-5", "gpt-5.2"]
-            if not any(rm in settings.openai_model for rm in reasoning_models):
+            reasoning_models = ["o1", "o1-mini", "o1-preview", "o3", "o3-mini", "o4-mini"]
+            if not any(rm == settings.openai_model or settings.openai_model.startswith(rm + "-") for rm in reasoning_models):
                 llm_kwargs["temperature"] = 0.3
             self._llm = LlamaOpenAI(**llm_kwargs)
 
@@ -74,9 +84,11 @@ class LlamaIndexService:
                 embed_kwargs["token"] = settings.hf_token
             self._embed_model = HuggingFaceEmbedding(**embed_kwargs)
 
-            # Set global LlamaIndex settings
-            LlamaSettings.llm = self._llm
-            LlamaSettings.embed_model = self._embed_model
+            # Only set global LlamaIndex settings for the default instance,
+            # not per-session instances (avoids cross-session key leaks)
+            if not self._api_key_override:
+                LlamaSettings.llm = self._llm
+                LlamaSettings.embed_model = self._embed_model
 
             self._initialized = True
             logger.info("LlamaIndex service initialized successfully")
@@ -137,9 +149,9 @@ class LlamaIndexService:
 
             # Check if model supports temperature
             settings = get_settings()
-            reasoning_models = ["o1", "o1-mini", "o1-preview", "gpt-5", "gpt-5.2"]
+            reasoning_models = ["o1", "o1-mini", "o1-preview", "o3", "o3-mini", "o4-mini"]
 
-            if any(rm in settings.openai_model for rm in reasoning_models):
+            if any(rm == settings.openai_model or settings.openai_model.startswith(rm + "-") for rm in reasoning_models):
                 # Reasoning models don't support temperature
                 response = await self._llm.achat(messages)
             else:
@@ -744,21 +756,85 @@ Return a JSON array of recommendation objects:
 # Singleton Instance
 # ============================================================================
 
+# Context variable for per-request API key override
+_current_api_key: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "_current_api_key", default=None
+)
+
 _llamaindex_service: Optional[LlamaIndexService] = None
+_session_services: Dict[str, LlamaIndexService] = {}
+_session_services_lock = asyncio.Lock()
+_MAX_SESSION_SERVICES = 50
 
 
 async def get_llamaindex_service() -> LlamaIndexService:
     """
-    Get or create singleton LlamaIndex service.
+    Get or create LlamaIndex service.
+
+    If a per-session API key is set via set_session_api_key(), returns
+    a service instance using that key. Otherwise returns the global singleton.
 
     Returns:
         Initialized LlamaIndexService instance
     """
+    # Check for per-session API key in context
+    api_key = _current_api_key.get()
+    if api_key:
+        return await get_llamaindex_service_for_session(api_key)
+
     global _llamaindex_service
     if _llamaindex_service is None:
         _llamaindex_service = LlamaIndexService()
         await _llamaindex_service.initialize()
     return _llamaindex_service
+
+
+def set_session_api_key(api_key: Optional[str]) -> contextvars.Token:
+    """
+    Set the OpenAI API key for the current async context.
+
+    All subsequent calls to get_llamaindex_service() within this context
+    will use the provided key. This is used by routes to propagate the
+    user's API key to agents without modifying agent code.
+
+    Args:
+        api_key: OpenAI API key, or None to clear
+
+    Returns:
+        Token to reset the context variable
+    """
+    return _current_api_key.set(api_key)
+
+
+async def get_llamaindex_service_for_session(
+    api_key: str,
+) -> LlamaIndexService:
+    """
+    Get or create a LlamaIndex service instance for a specific API key.
+
+    Creates a separate instance per unique API key so that each user session
+    uses its own OpenAI credentials. Uses a hashed key to avoid storing raw
+    API keys as dict keys, and an asyncio.Lock to prevent race conditions.
+
+    Args:
+        api_key: User-provided OpenAI API key
+
+    Returns:
+        Initialized LlamaIndexService instance configured with the given key
+    """
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+
+    async with _session_services_lock:
+        if key_hash not in _session_services:
+            # Evict oldest entry if cache is full
+            if len(_session_services) >= _MAX_SESSION_SERVICES:
+                oldest_key = next(iter(_session_services))
+                del _session_services[oldest_key]
+
+            service = LlamaIndexService(api_key=api_key)
+            await service.initialize()
+            _session_services[key_hash] = service
+        return _session_services[key_hash]
 
 
 def get_llamaindex_service_sync() -> LlamaIndexService:

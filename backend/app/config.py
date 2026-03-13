@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # OpenAI Configuration
     # ========================================================================
     openai_api_key: str = Field(..., description="OpenAI API key")
-    openai_model: str = Field("gpt-5.2", description="OpenAI model to use")
+    openai_model: str = Field("gpt-5-mini", description="OpenAI model to use")
 
     # ========================================================================
     # Neo4j Configuration
@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     # ========================================================================
     # Application Configuration
     # ========================================================================
+    app_password: Optional[str] = Field(
+        None, description="Application password for login (uses server API key)"
+    )
     session_secret_key: str = Field(
         "dev-secret-key-change-in-prod",
         description="Secret key for session management"

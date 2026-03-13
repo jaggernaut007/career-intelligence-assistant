@@ -1,7 +1,7 @@
 """
 LLM Service.
 
-Wrapper for OpenAI GPT-5.2 Thinking model with structured output support.
+Wrapper for OpenAI GPT-5-mini Thinking model with structured output support.
 """
 
 import json
@@ -19,17 +19,24 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class LLMService:
-    """OpenAI GPT-5.2 Thinking wrapper with structured output support."""
+    """OpenAI GPT-5-mini Thinking wrapper with structured output support."""
 
-    def __init__(self):
-        """Initialize LLM service."""
+    def __init__(self, api_key: str | None = None):
+        """Initialize LLM service.
+
+        Args:
+            api_key: Optional OpenAI API key override (per-session).
+                     Falls back to environment config if not provided.
+        """
         self._client: Optional[AsyncOpenAI] = None
+        self._api_key_override = api_key
 
     def _get_client(self) -> AsyncOpenAI:
         """Get or create OpenAI client."""
         if self._client is None:
             settings = get_settings()
-            self._client = AsyncOpenAI(api_key=settings.openai_api_key)
+            api_key = self._api_key_override or settings.openai_api_key
+            self._client = AsyncOpenAI(api_key=api_key)
         return self._client
 
     async def complete(
