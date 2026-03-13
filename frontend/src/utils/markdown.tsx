@@ -16,7 +16,7 @@ export function renderMarkdown(text: string): string {
     .replace(/>/g, '&gt;');
 
   // Code blocks (```)
-  html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+  html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, _lang, code) => {
     return `<pre class="bg-gray-800 text-gray-100 p-3 rounded-lg my-2 overflow-x-auto text-xs"><code>${code.trim()}</code></pre>`;
   });
 

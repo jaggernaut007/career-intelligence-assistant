@@ -8,7 +8,6 @@ import logging
 from typing import List, Optional
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
 
 from app.config import get_settings
 
@@ -20,7 +19,7 @@ class EmbeddingService:
 
     def __init__(self):
         """Initialize embedding service."""
-        self._model: Optional[SentenceTransformer] = None
+        self._model = None
         self._cache: dict = {}  # Simple in-memory cache
 
     @property
@@ -33,9 +32,11 @@ class EmbeddingService:
         """Get embedding dimension."""
         return get_settings().embedding_dimension
 
-    def _get_model(self) -> SentenceTransformer:
+    def _get_model(self):
         """Lazy load the embedding model."""
         if self._model is None:
+            from sentence_transformers import SentenceTransformer
+
             logger.info(f"Loading embedding model: {self.model_name}")
             self._model = SentenceTransformer(
                 self.model_name,

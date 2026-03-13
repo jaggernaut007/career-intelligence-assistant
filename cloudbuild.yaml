@@ -1,0 +1,14 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'Dockerfile.cloudrun'
+      - '-t'
+      - 'europe-west2-docker.pkg.dev/career-intel-assistant/career-assistant/combined:latest'
+      - '.'
+images:
+  - 'europe-west2-docker.pkg.dev/career-intel-assistant/career-assistant/combined:latest'
+timeout: 1800s
+options:
+  machineType: 'E2_HIGHCPU_8'

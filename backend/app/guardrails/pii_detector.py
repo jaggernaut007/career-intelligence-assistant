@@ -28,7 +28,6 @@ class PIIDetector:
         self._analyzer = None
         self._anonymizer = None
         self._initialized = False
-        self._initialize()
 
     def _initialize(self) -> None:
         """Lazy initialize Presidio components."""
@@ -68,6 +67,8 @@ class PIIDetector:
         """
         if not text or not text.strip():
             return []
+
+        self._initialize()
 
         results = []
 
@@ -185,6 +186,8 @@ class PIIDetector:
         """
         if not text or not text.strip():
             return text
+
+        self._initialize()
 
         # Try Presidio anonymizer first
         if self._analyzer and self._anonymizer:
