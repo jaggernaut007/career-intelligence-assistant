@@ -1,7 +1,7 @@
 # PROGRESS.md — Career Intelligence Assistant
 
 ## Current State
-**Last Updated**: 2026-03-13
+**Last Updated**: 2026-03-18
 **Status**: Deployed to GCP Cloud Run, optimization planned
 
 ## What's Working
@@ -31,7 +31,7 @@
 - [ ] Verify health at lower specs
 
 ## Recent Decisions
-- Use `gpt-5-mini` as the OpenAI model (2026-03-13)
+- Use `gpt-5.4-mini` as the default OpenAI model for better efficiency within current token budgets (2026-03-18)
 - Min instances set to 0 for cost savings (scale to zero when idle) (2026-03-13)
 - Plan to replace local embeddings with OpenAI API to eliminate PyTorch dependency (2026-03-13)
 - Adopted agentic coding workflow per docs/agentic-guide-v2.md (2026-03-13)

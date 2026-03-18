@@ -9,7 +9,7 @@ The Career Intelligence Assistant is a multi-agent AI system that analyzes resum
 │                              External Services                               │
 ├─────────────────────┬─────────────────────┬─────────────────────────────────┤
 │     OpenAI API      │   Neo4j AuraDB      │       HuggingFace               │
-│   (GPT-5.2 LLM)     │ (Graph + Vector)    │   (Embeddings API)              │
+│ (gpt-5.4-mini LLM)  │ (Graph + Vector)    │   (Embeddings API)              │
 └──────────┬──────────┴──────────┬──────────┴──────────────┬──────────────────┘
            │                     │                         │
            └─────────────────────┼─────────────────────────┘

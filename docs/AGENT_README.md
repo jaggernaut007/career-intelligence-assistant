@@ -53,7 +53,7 @@ See [Quick Start Guide](docs/getting-started/quick-start.md) for detailed setup.
                            ▼                        ▼
                     ┌─────────────┐          ┌─────────────┐
                     │  Neo4j DB   │          │  OpenAI API │
-                    │(graph+vector)│          │  (GPT-5.2)  │
+                    │(graph+vector)│          │(gpt-5.4-mini)│
                     └─────────────┘          └─────────────┘
 ```
 

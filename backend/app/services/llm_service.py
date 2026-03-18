@@ -1,7 +1,7 @@
 """
 LLM Service.
 
-Wrapper for OpenAI GPT-5-mini Thinking model with structured output support.
+Wrapper for the configured OpenAI chat model with structured output support.
 """
 
 import json
@@ -19,7 +19,7 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class LLMService:
-    """OpenAI GPT-5-mini Thinking wrapper with structured output support."""
+    """OpenAI chat-model wrapper with structured output support."""
 
     def __init__(self, api_key: str | None = None):
         """Initialize LLM service.

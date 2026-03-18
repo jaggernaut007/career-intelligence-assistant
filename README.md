@@ -82,14 +82,14 @@
 
 ## 4. Key Decisions Made
 - **Neo4j AuraDB**: Chosen for its robust graph database capabilities, ideal for modeling complex relationships in career data vs Pinecone which was considered but not selected due to its efficiency in handling vector data but less suited for relational data modeling.
-- **OpenAI**: Selected GPT-5.2 for its high reasoning capabilities enhancing the AI assistant's performance in understanding and generating human-like text.
+- **OpenAI**: Selected `gpt-5.4-mini` as the default model for strong quality-per-token efficiency across analysis and chat tasks.
 - **FastAPI and React**: Used for backend and frontend development respectively, for multi-threading and fast development and servers.
 - **UV package manager**: Utilized for efficient dependency management and environment setup.
 - **LlamaIndex**: Employed for building a knowledge graph from unstructured data, enhancing the AI's understanding of career-related information. Its efficiency in RAG workloads. Its workflow framework was leveraged to implement a multi-agentic approach, allowing different AI models to specialize in various tasks vs LangGraph which was considered but not selected due to its complexity and overhead for this specific use case.
 - **Nomic Embed Text v1.5**: Used nomic-embed-text-v1.5 embeddings for generating high-quality text embeddings to improve semantic search and recommendations, on-device with high latency vs other embedding models which were considered but not selected due to their lower performance in this context.
 - **Docker**: Considered for containerization, if we would need to deploy, but opted for local setup to simplify initial development and testing.
 - **Modular Architecture**: Designed the application with a modular approach to facilitate future enhancements and maintenance. Easy to use service-oriented and model layers based architecture.
-- **OpenAI GPT-5.2**: Leveraged for its superior language understanding and generation capabilities, enhancing the AI assistant's performance in providing career advice and insights.
+- **OpenAI `gpt-5.4-mini`**: Used as the primary LLM for structured extraction, reasoning, and conversational assistance.
 - **Claude Code Interpreter**: Integrated for its advanced code interpretation features, and ability to handle complex coding tasks while pair programming.
 - **Test-Driven and Spec-Supported Development**: Adopted TDD approach to ensure code quality and reliability through comprehensive testing and spec-driven development practices for clear requirements and functionality definition to ensure the AI understands everything deterministically.
 
@@ -459,7 +459,7 @@ Parallel execution via @step + ctx.send_event() reduces time by ~60%
 │   │   │                                                                           │     │   │
 │   │   │   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐                │     │   │
 │   │   │   │   Agent     │────►│   Response  │────►│  LLM Judge  │                │     │   │
-│   │   │   │   Output    │     │   + Context │     │ (GPT-5.2)   │                │     │   │
+│   │   │   │   Output    │     │   + Context │     │(gpt-5.4-mini)│                │     │   │
 │   │   │   └─────────────┘     └─────────────┘     └──────┬──────┘                │     │   │
 │   │   │                                                  │                        │     │   │
 │   │   │                                                  ▼                        │     │   │
@@ -581,7 +581,7 @@ Parallel execution via @step + ctx.send_event() reduces time by ~60%
 - **LangGraph vs LlamaIndex**: Required a framework for multi-agent orchestration. Evaluated LangGraph but chose LlamaIndex workflow for its native Neo4j integration, simpler workflow API, and 35% better retrieval accuracy in RAG benchmarks, reducing development time while improving response quality.
 - **Message Bus vs LlamaIndex Workflow**: Needed inter-agent communication for parallel processing. Evaluated Redis pub/sub and RabbitMQ messaging services but chose LlamaIndex's built-in workflow engine. Parallel execution was achieved. Trade-off: single-process only, but sufficient for demo scale with upgrade path to Redis if needed.
 - **Generalist vs Specialized Agents**: Needed to balance accuracy against complexity. Chose 7 specialized agents (Resume Parser, JD Analyzer, Skill Matcher, Recommendation, Interview Prep, Market Insights, Chat Fit) over fewer generalists, achieving more focused prompts and enabling parallel execution that reduced analysis time by 60%.
-- **Direct Vectorization vs Document Processing**: Needed to extract career data from resumes. Evaluated direct embedding by chunking the document, but chose structured NER extraction via GPT-5.2 to capture skills, experiences, and relationships, enabling richer graph modeling and more accurate skill-gap analysis than pure semantic search.
+- **Direct Vectorization vs Document Processing**: Needed to extract career data from resumes. Evaluated direct embedding by chunking the document, but chose structured extraction via `gpt-5.4-mini` to capture skills, experiences, and relationships, enabling richer graph modeling and more accurate skill-gap analysis than pure semantic search.
 - **Graph-Aware Skill Normalization vs Simple Embedding**: Needed to handle skill variations ("React.js" vs "ReactJS"). Chose LLM extraction with Neo4j context over pure embedding similarity,or using a pure LLM based graph storage technique. Making the system self-improving as the graph grows. Optimized with 5-minute caching (20ms → 1ms) and parallel fallback (1.5s → 200ms), adding only 200-400ms total latency.
 
 ## 8. Future Enhancements

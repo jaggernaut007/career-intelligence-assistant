@@ -10,8 +10,8 @@ These must be set for the application to function.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `OPENAI_API_KEY` | Yes | - | OpenAI API key for GPT-5-mini |
-| `OPENAI_MODEL` | No | `gpt-5-mini` | OpenAI model to use |
+| `OPENAI_API_KEY` | Yes | - | OpenAI API key for the configured OpenAI model |
+| `OPENAI_MODEL` | No | `gpt-5.4-mini` | OpenAI model to use |
 
 ### Neo4j Configuration
 
@@ -72,7 +72,7 @@ These must be set for the application to function.
 # OpenAI Configuration
 # =============================================================================
 OPENAI_API_KEY=sk-your-api-key-here
-OPENAI_MODEL=gpt-5-mini
+OPENAI_MODEL=gpt-5.4-mini
 
 # =============================================================================
 # Neo4j AuraDB Configuration

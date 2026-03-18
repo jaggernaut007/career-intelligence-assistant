@@ -7,11 +7,11 @@ set -euo pipefail
 
 # --- Configuration ---
 PROJECT_ID="career-intel-assistant"
-REGION="europe-west2"
+REGION="europe-west1"
 SERVICE_NAME="career-assistant"
 REPO="career-assistant"
 IMAGE_NAME="combined"
-IMAGE="europe-west2-docker.pkg.dev/${PROJECT_ID}/${REPO}/${IMAGE_NAME}:latest"
+IMAGE="europe-west1-docker.pkg.dev/${PROJECT_ID}/${REPO}/${IMAGE_NAME}:latest"
 SERVICE_ACCOUNT="973476355791-compute@developer.gserviceaccount.com"
 
 # --- Resource Settings ---
@@ -20,7 +20,7 @@ CPU="2"
 MIN_INSTANCES="0"
 
 # --- Environment Variables ---
-OPENAI_MODEL="gpt-5-mini"
+OPENAI_MODEL="gpt-5.4-mini"
 ENVIRONMENT="production"
 
 # --- Secrets (from GCP Secret Manager) ---

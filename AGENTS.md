@@ -7,7 +7,7 @@ Career Intelligence Assistant — AI-powered resume analysis and job matching pl
 - **Backend**: Python 3.11+, FastAPI, LlamaIndex Workflows, Pydantic v2
 - **Frontend**: React 18, TypeScript 5.3, Vite 5, Zustand, Tailwind CSS 3.4, React Query 5
 - **Database**: Neo4j 5.17 (Graph + Vector Store)
-- **LLM**: OpenAI (gpt-5-mini) via `backend/app/services/llm_service.py`
+- **LLM**: OpenAI (`gpt-5.4-mini` by default) via `backend/app/services/llm_service.py`
 - **Testing**: pytest (backend), Vitest (frontend)
 - **Code Intelligence**: Nexus-MCP (hybrid search, call graphs, impact analysis, code quality)
 - **Linting**: ruff + black + isort (backend), ESLint + Prettier (frontend)

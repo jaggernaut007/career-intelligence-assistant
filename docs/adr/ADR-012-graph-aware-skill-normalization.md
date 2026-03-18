@@ -13,7 +13,7 @@ Resumes and job descriptions use inconsistent skill naming: "React", "ReactJS", 
 Implement a 3-tier normalization pipeline:
 
 1. **Neo4j context query**: Fetch existing normalized skill names from the graph (with 5-minute TTL cache)
-2. **LLM normalization**: Pass the raw skill + existing skill list to GPT-5.2; the LLM maps to existing names or creates new canonical forms
+2. **LLM normalization**: Pass the raw skill + existing skill list to `gpt-5.4-mini`; the LLM maps to existing names or creates new canonical forms
 3. **Vector similarity fallback**: If LLM is uncertain, compute cosine similarity (threshold 0.75) between the new skill embedding and existing skill embeddings
 
 This pipeline runs in both Resume Parser and JD Analyzer agents before storing skills in Neo4j.
