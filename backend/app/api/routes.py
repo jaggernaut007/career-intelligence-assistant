@@ -407,10 +407,10 @@ async def upload_resume(
 
     # Validate file
     input_validator = get_input_validator()
-
     # Check file size
     content = await file.read()
     if len(content) > input_validator.max_file_size:
+        logger.warning(f"File too large: {len(content)} bytes (limit: {input_validator.max_file_size})")
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"File size exceeds maximum of {input_validator.max_file_size // (1024*1024)}MB",
@@ -419,21 +419,23 @@ async def upload_resume(
     # Check file extension
     filename = file.filename or "unknown"
     extension = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-
     if extension not in input_validator.ALLOWED_EXTENSIONS:
+        logger.warning(f"Unsupported file extension: {extension}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported file type: {extension}. Allowed: {', '.join(input_validator.ALLOWED_EXTENSIONS)}",
         )
 
-    # Check file type by magic bytes
+    # Check file content safety
     if extension == ".pdf" and not content.startswith(b"%PDF"):
+        logger.warning(f"Invalid PDF content for file with .pdf extension")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File content does not match PDF format",
         )
 
     if extension in {".exe", ".dll", ".bat", ".sh"} or content.startswith(b"MZ") or content.startswith(b"\x7fELF"):
+        logger.warning(f"Blocked executable file: {extension} or magic bytes detected")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Executable files are not allowed",
@@ -459,10 +461,19 @@ async def upload_resume(
             detail=error,
         )
 
+    # Require API key before upload
+    if not session.openai_api_key:
+        logger.error(f"User attempted upload without API key - Session: {session.session_id}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OpenAI API key required. Please set your API key before uploading.",
+        )
+
     # Check for prompt injection
     prompt_guard = get_prompt_guard()
     is_safe, injection_error = prompt_guard.validate(resume_text)
     if not is_safe:
+        logger.warning(f"Prompt injection detected in resume: {injection_error} - Session: {session.session_id}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Content failed security validation: {injection_error}",
