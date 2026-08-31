@@ -1,6 +1,11 @@
 # TODO — Instance Optimization
 
-Goal: Reduce Cloud Run memory/CPU requirements from 4Gi/2CPU to ~1Gi/1CPU.
+> **Note (2026-08-31):** The GCP Cloud Run deployment has been **decommissioned**
+> (see ADR-008). The Cloud Run–specific tasks below (spec reduction, rebuild &
+> deploy) no longer apply. The dependency-slimming tasks are still worthwhile for
+> local Docker Compose runs and any future hosting.
+
+Goal (historical): Reduce Cloud Run memory/CPU requirements from 4Gi/2CPU to ~1Gi/1CPU.
 
 ## Tasks
 
@@ -20,11 +25,6 @@ Goal: Reduce Cloud Run memory/CPU requirements from 4Gi/2CPU to ~1Gi/1CPU.
   - Remove: `--extra-index-url` for PyTorch CPU
   - Keep: `openai` (already present)
 
-- [ ] Reduce Cloud Run instance specs
-  - Memory: 4Gi → 1Gi
-  - CPU: 2 → 1
-  - Update `deploy.sh` with new specs
+- [x] ~~Reduce Cloud Run instance specs~~ — N/A, Cloud Run infra decommissioned 2026-08-31
 
-- [ ] Rebuild and deploy optimized image
-  - Smaller Docker image (no PyTorch layer)
-  - Verify health check passes at lower specs
+- [x] ~~Rebuild and deploy optimized image~~ — N/A, Cloud Run infra decommissioned 2026-08-31

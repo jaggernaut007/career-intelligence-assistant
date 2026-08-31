@@ -1,3 +1,9 @@
+# ============================================================================
+# ⚠️  DECOMMISSIONED — 2026-08-31
+# The GCP Cloud Run deployment this image was built for has been torn down.
+# Kept for historical reference / possible local use only. See deploy.sh header.
+# ============================================================================
+
 # Combined Career Intelligence Assistant - Single Cloud Run Container
 # Frontend (nginx) + Backend (uvicorn) in one container
 

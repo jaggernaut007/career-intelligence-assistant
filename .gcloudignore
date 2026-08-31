@@ -1,3 +1,5 @@
+# DECOMMISSIONED 2026-08-31 — GCP Cloud Run infra for this project was torn down.
+# Kept for historical reference only.
 .git
 .gitignore
 node_modules

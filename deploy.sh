@@ -2,6 +2,22 @@
 set -euo pipefail
 
 # ============================================================================
+# ⚠️  DECOMMISSIONED — 2026-08-31
+# ============================================================================
+# The GCP Cloud Run deployment for this project has been torn down. Deleted:
+#   - Cloud Run service `career-assistant` (europe-west1)
+#   - Artifact Registry repos `career-assistant` (europe-west1, europe-west2)
+#   - Secret Manager: APP_PASSWORD, NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD,
+#     CAREER_ASSISTANT_API_KEY, CAREER_ASSISTANT_API_URL
+# This script is kept for historical reference only. Running it will recreate
+# billable infrastructure. To intentionally re-provision, set ALLOW_RECOMMISSION=1.
+# ============================================================================
+if [[ "${ALLOW_RECOMMISSION:-0}" != "1" ]]; then
+  echo "deploy.sh is DECOMMISSIONED (2026-08-31). Set ALLOW_RECOMMISSION=1 to override." >&2
+  exit 1
+fi
+
+# ============================================================================
 # Career Intelligence Assistant — Cloud Run Deployment Script
 # ============================================================================
 

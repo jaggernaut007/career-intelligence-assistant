@@ -1,3 +1,9 @@
+# ============================================================================
+# ⚠️  DECOMMISSIONED — 2026-08-31
+# GCP Cloud Run infra for this project was torn down (service `career-assistant`,
+# Artifact Registry repos, and project-specific secrets). The target Artifact
+# Registry repo below no longer exists. Kept for historical reference only.
+# ============================================================================
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:

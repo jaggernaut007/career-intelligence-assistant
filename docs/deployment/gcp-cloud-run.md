@@ -1,5 +1,14 @@
 # GCP Cloud Run Deployment Guide
 
+> **⚠️ DECOMMISSIONED — 2026-08-31.** The GCP Cloud Run deployment for this
+> project has been torn down. Deleted resources: Cloud Run service
+> `career-assistant` (europe-west1), Artifact Registry repos `career-assistant`
+> (europe-west1 & europe-west2), and the project-specific Secret Manager secrets
+> (`APP_PASSWORD`, `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`,
+> `CAREER_ASSISTANT_API_KEY`, `CAREER_ASSISTANT_API_URL`). The shared GCP project
+> `career-intel-assistant` still hosts other apps and was left intact. This guide
+> is retained for historical reference only. See [ADR-008](../adr/ADR-008-gcp-cloud-run-deployment.md).
+
 Deploy the Career Intelligence Assistant to Google Cloud Run for serverless, auto-scaling production hosting.
 
 ## Prerequisites

@@ -1,7 +1,15 @@
 # ADR-008: GCP Cloud Run Serverless Deployment
 
 ## Status
-Accepted
+Decommissioned (2026-08-31) — was: Accepted
+
+The GCP Cloud Run infrastructure described here has been torn down: Cloud Run
+service `career-assistant` (europe-west1), Artifact Registry repos
+`career-assistant` (europe-west1 & europe-west2), and the project-specific
+Secret Manager secrets. The shared GCP project `career-intel-assistant` (which
+also hosts unrelated apps) was left intact. The Neo4j AuraDB instance is hosted
+outside GCP and must be shut down separately if no longer needed. This ADR is
+retained as a historical record of the decision.
 
 ## Context
 The application needs a production hosting solution that:
