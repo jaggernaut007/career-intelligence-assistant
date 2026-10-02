@@ -16,18 +16,11 @@
 - If uncertain about a past decision, check `docs/adr/` before guessing
 
 ### Nexus-MCP Code Intelligence
-Use Nexus-MCP actively for codebase understanding instead of manual grep/read loops:
-- `search` — hybrid semantic+keyword+graph search for discovering relevant code ("find rate limiting logic")
-- `find_symbol` — look up any function/class by name to get definition and relationships
-- `find_callers` / `find_callees` — trace call graphs before modifying a function
-- `impact` — run transitive change impact analysis before any refactor or API change
-- `explain` — get combined graph+vector explanation of what a symbol does and how it's used
-- `analyze` — check complexity, dependencies, code smells, and quality score for a path
-- `architecture` — get high-level architectural overview (layers, dependencies, entry points)
-- `overview` — get project stats (languages, file counts, symbol counts, quality summary)
-- `remember` / `recall` — persist and retrieve semantic memories across sessions
-
-**When to use**: Before modifying any function, run `find_callers` + `impact` to understand blast radius. Before implementing new features, run `search` to find existing patterns. At session start, run `overview` to orient. Use `explain` instead of manually reading multiple files to understand a symbol.
+- The nexus tools are deferred. Run ToolSearch with `select:mcp__nexus__index,mcp__nexus__search,mcp__nexus__map,mcp__nexus__find_symbol,mcp__nexus__graph,mcp__nexus__explain`.
+- At session start, call `index` with the absolute path of the working folder.
+- To find files or code, call `search` or `find_symbol` before Grep or Glob. Read only the files that nexus names.
+- Before you change a shared symbol, call `graph` with `transitive=true`.
+- The current tools are `status`, `index`, `map`, `search`, `find_symbol`, `graph`, `explain`, `analyze`, `memory` and `health`.
 
 ### Hallucination Prevention
 - For any external library or API, check MCP docs servers first

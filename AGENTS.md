@@ -54,11 +54,11 @@ docker compose up --build
 5. E2E smoke test passes (`./scripts/init.sh`)
 
 ## Code Intelligence (Nexus-MCP)
-- Before modifying a function: run `find_callers` + `impact` to understand blast radius
-- Before implementing new features: run `search` to find existing patterns
-- At session start: run `overview` to orient on project structure
-- For code understanding: use `explain` on unfamiliar symbols instead of manually reading files
-- For refactoring: run `analyze` on the target path to check complexity and quality
+- Load the deferred nexus tools first: ToolSearch `select:mcp__nexus__index,mcp__nexus__search,mcp__nexus__map,mcp__nexus__find_symbol,mcp__nexus__graph,mcp__nexus__explain`
+- At session start: call `index` with the absolute path of the working folder
+- To find files or code: call `search` or `find_symbol` before Grep or Glob
+- Before modifying a shared symbol: call `graph` with `transitive=true`
+- For complexity and quality: call `analyze` on the target path. For one symbol: call `explain`
 
 ## Session Start Protocol
 1. Read PROGRESS.md for current project state
